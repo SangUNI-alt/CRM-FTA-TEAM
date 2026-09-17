@@ -17,8 +17,8 @@
       <h1 class="text-xl font-bold text-indigo-700">CRM ECIS Explorer (M365 Cloud)</h1>
       <p class="text-xs text-gray-500">Kết nối trực tiếp SharePoint / OneDrive Doanh nghiệp</p>
     </div>
-    <div id="userInfo" class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border font-semibold">
-      Đang xác thực tài khoản M365...
+    <div id="userInfo" class="text-xs">
+      <span class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border font-semibold">Đang khởi tạo hệ thống...</span>
     </div>
   </div>
 
@@ -28,10 +28,10 @@
     <div class="w-1/2 bg-white rounded-xl shadow-md p-4 flex flex-col border">
       <div class="pb-3 border-b mb-3 flex justify-between items-center">
         <h2 class="font-bold text-gray-700">📂 Danh Sách Thư Mục Con (%ECIS%)</h2>
-        <input type="text" id="searchEcis" onkeyup="filterEcis()" placeholder="Tìm %ECIS%..." class="p-1 border rounded text-xs w-36">
+        <input type="text" id="searchEcis" onkeyup="filterEcis()" placeholder="Tìm %ECIS%..." class="p-1.5 border rounded text-xs w-36 focus:outline-none focus:ring-1 focus:ring-indigo-500">
       </div>
       <div class="flex-1 overflow-y-auto" id="ecisListContainer">
-        <div class="text-center py-10 text-gray-400 text-sm">Đang tải dữ liệu từ Cloud...</div>
+        <div class="text-center py-10 text-gray-400 text-sm">Vui lòng đăng nhập tài khoản M365 để tải dữ liệu</div>
       </div>
     </div>
 
@@ -48,98 +48,164 @@
   </div>
 
   <script>
-    // CẤU HÌNH THÔNG TIN AZURE APP CỦA BẠN TẠI ĐÂY
+    // =========================================================
+    // CẤU HÌNH THÔNG TIN THAY THẾ
+    // =========================================================
     const CLIENT_ID = "1f5c6852-079c-463a-8fc8-e814359698ee";
     const TENANT_ID = "a70e2894-d043-4c2d-b843-b376e7e7df4b";
-    const PARENT_FOLDER_ID = "https://uniconsulting079.sharepoint.com/:f:/s/SEDOVINA_CO/IgAJaovqxuNDQq6KUumP_IkHAXQkx84t9aAqB-3t5UwndeE?e=c8ESDY";
+    const PARENT_FOLDER_ID = "https://uniconsulting079.sharepoint.com/:f:/s/SEDOVINA_CO/IgAJaovqxuNDQq6KUumP_IkHAXQkx84t9aAqB-3t5UwndeE?e=OEWhSl";
+    const REDIRECT_URI = "https://SangUNI-alt.github.io/CRM-FTA-TEAM/";
 
     let accessToken = "";
     let ecisData = [];
+    let msalInstance = null;
 
-    // Khởi tạo MS Teams SDK
+    // Khởi tạo Microsoft Teams Client SDK
     microsoftTeams.app.initialize().then(() => {
-      // Đăng nhập lấy Token gọi Graph API
-      getToken();
+      initMsal();
+    }).catch(err => {
+      // Trường hợp chạy ngoài ứng dụng Teams (chạy trực tiếp trình duyệt)
+      initMsal();
     });
 
-    async function getToken() {
+    function initMsal() {
       const msalConfig = {
-        auth: { clientId: CLIENT_ID, authority: `https://login.microsoftonline.com/${TENANT_ID}` }
+        auth: { 
+          clientId: CLIENT_ID, 
+          authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+          redirectUri: REDIRECT_URI
+        },
+        cache: {
+          cacheLocation: "localStorage",
+          storeAuthStateInCookie: true
+        }
       };
-      const msalInstance = new msal.PublicClientApplication(msalConfig);
       
+      msalInstance = new msal.PublicClientApplication(msalConfig);
+
+      // Thêm nút bấm đăng nhập thủ công tránh bị rào cản Pop-up Blocker
+      const userInfoEl = document.getElementById('userInfo');
+      userInfoEl.innerHTML = `<button onclick="getToken()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg shadow text-xs transition">🔑 Đăng Nhập M365</button>`;
+    }
+
+    async function getToken() {
+      const userInfoEl = document.getElementById('userInfo');
+      userInfoEl.innerHTML = `<span class="text-gray-500 font-semibold text-xs">Đang xử lý xác thực...</span>`;
+
       try {
-        const response = await msalInstance.loginPopup({ scopes: ["Files.Read.All", "User.Read"] });
+        const response = await msalInstance.loginPopup({ 
+          scopes: ["Files.Read.All", "User.Read"] 
+        });
         accessToken = response.accessToken;
-        document.getElementById('userInfo').innerText = `👤 ${response.account.username}`;
+        userInfoEl.innerHTML = `<span class="bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 font-semibold text-xs">👤 ${response.account.username}</span>`;
         
-        // Gọi Graph API lấy thư mục con
+        // Đăng nhập thành công -> Tải danh sách thư mục con
         loadEcisFolders();
       } catch (err) {
         console.error("Lỗi xác thực:", err);
+        userInfoEl.innerHTML = `<button onclick="getToken()" class="bg-red-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow">❌ Thử Đăng Nhập Lại</button>`;
       }
     }
 
-    // Gọi Microsoft Graph API lấy toàn bộ Folder Con cấp 1 (%ECIS%)
+    // Gọi Microsoft Graph API lấy toàn bộ Thư Mục Con (%ECIS%)
     async function loadEcisFolders() {
+      const container = document.getElementById('ecisListContainer');
+      container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Đang tải dữ liệu từ Cloud...</div>';
+
       const url = `https://graph.microsoft.com/v1.0/me/drive/items/${PARENT_FOLDER_ID}/children?$filter=folder ne null`;
       
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const data = await res.json();
-      ecisData = data.value || [];
+      try {
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const data = await res.json();
+        ecisData = data.value || [];
 
-      renderEcisList(ecisData);
+        renderEcisList(ecisData);
+      } catch (err) {
+        console.error("Lỗi lấy dữ liệu:", err);
+        container.innerHTML = '<div class="text-center py-10 text-red-500 text-sm">Không thể tải dữ liệu folder. Kiểm tra PARENT_FOLDER_ID.</div>';
+      }
     }
 
     function renderEcisList(folders) {
       const container = document.getElementById('ecisListContainer');
       container.innerHTML = '';
 
+      if (folders.length === 0) {
+        container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Không tìm thấy thư mục con nào.</div>';
+        return;
+      }
+
       folders.forEach(folder => {
         container.innerHTML += `
-          <div onclick="loadFilesForEcis('${folder.id}', '${folder.name}')" class="p-3 hover:bg-indigo-50 border-b cursor-pointer flex justify-between items-center">
-            <div class="flex items-center gap-2">
-              <span class="text-xs bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded">%ECIS%</span>
-              <span class="font-medium text-gray-800 text-sm">${folder.name}</span>
+          <div onclick="loadFilesForEcis('${folder.id}', '${escapeJsString(folder.name)}')" class="p-3 hover:bg-indigo-50 border-b cursor-pointer flex justify-between items-center transition">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <span class="text-xs bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded flex-none">%ECIS%</span>
+              <span class="font-medium text-gray-800 text-sm truncate">${folder.name}</span>
             </div>
-            <span class="text-xs text-gray-400">📂 Thư mục</span>
+            <span class="text-xs text-gray-400 flex-none">📂 Thư mục</span>
           </div>
         `;
       });
     }
 
-    // Khi chọn 1 %ECIS% -> Gọi tiếp Graph API lấy các file bên trong
+    // Khi chọn 1 %ECIS% -> Gọi Graph API lấy danh sách File bên trong
     async function loadFilesForEcis(folderId, folderName) {
       document.getElementById('selectedEcisTitle').innerText = `📂 %ECIS%: ${folderName}`;
       const container = document.getElementById('fileListContainer');
-      container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Đang đọc file...</div>';
+      container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Đang đọc danh sách file...</div>';
 
       const url = `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children?$filter=folder eq null`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const data = await res.json();
-      const files = data.value || [];
+      
+      try {
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const data = await res.json();
+        const files = data.value || [];
 
-      container.innerHTML = '';
-      if (files.length === 0) {
-        container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Không có file nào</div>';
-        return;
-      }
+        container.innerHTML = '';
+        if (files.length === 0) {
+          container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Thư mục này trống.</div>';
+          return;
+        }
 
-      files.forEach(file => {
-        container.innerHTML += `
-          <div class="p-3 bg-gray-50 rounded mb-2 border flex justify-between items-center">
-            <div>
-              <div class="font-semibold text-gray-800 text-sm">📄 ${file.name}</div>
-              <div class="text-xs text-gray-400">${Math.round(file.size / 1024)} KB</div>
+        files.forEach(file => {
+          container.innerHTML += `
+            <div class="p-3 bg-gray-50 rounded-lg mb-2 border hover:shadow-sm transition flex justify-between items-center">
+              <div class="overflow-hidden pr-2">
+                <div class="font-semibold text-gray-800 text-sm truncate">📄 ${file.name}</div>
+                <div class="text-xs text-gray-400">${formatBytes(file.size)}</div>
+              </div>
+              <a href="${file.webUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 font-medium flex-none">Mở File</a>
             </div>
-            <a href="${file.webUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Mở File</a>
-          </div>
-        `;
-      });
+          `;
+        });
+      } catch (err) {
+        console.error("Lỗi lấy file:", err);
+        container.innerHTML = '<div class="text-center py-10 text-red-500 text-sm">Lỗi đọc file trong thư mục này.</div>';
+      }
+    }
+
+    // Lọc dữ liệu nhanh
+    function filterEcis() {
+      const keyword = document.getElementById('searchEcis').value.toLowerCase();
+      const filtered = ecisData.filter(item => item.name.toLowerCase().includes(keyword));
+      renderEcisList(filtered);
+    }
+
+    // Chuyển đổi Bytes sang KB/MB
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function escapeJsString(str) {
+      return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
     }
   </script>
 </body>
