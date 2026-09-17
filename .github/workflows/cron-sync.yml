@@ -2,9 +2,8 @@ name: Auto Sync SharePoint to Supabase
 
 on:
   schedule:
-    # Chạy tự động mỗi 15 phút
     - cron: '*/15 * * * *'
-  workflow_dispatch: # Cho phép chạy thủ công
+  workflow_dispatch:
 
 jobs:
   sync:
@@ -17,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install Dependencies
         run: npm install
