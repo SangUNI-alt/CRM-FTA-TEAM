@@ -2,8 +2,9 @@ name: Auto Sync SharePoint to Supabase
 
 on:
   schedule:
+    # Chạy tự động mỗi 15 phút
     - cron: '*/15 * * * *'
-  workflow_dispatch:
+  workflow_dispatch: # Cho phép chạy thủ công
 
 jobs:
   sync:
