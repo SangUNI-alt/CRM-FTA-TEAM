@@ -17,7 +17,7 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
       <div>
         <h1 class="text-3xl font-bold text-slate-800">Quản Lý Thư Mục ECIS 2026</h1>
-        <p class="text-sm text-gray-500 mt-1">Theo dõi số lượng chứng từ PDF và bảng kê XLS/XLSX thời gian thực</p>
+        <p class="text-sm text-gray-500 mt-1">Theo dõi các loại chứng từ PDF thiếu và Mã tờ khai Excel thời gian thực</p>
       </div>
       <div class="flex items-center gap-2">
         <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -30,28 +30,24 @@
     </div>
 
     <!-- KPI STATS CARDS -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-        <p class="text-xs font-medium text-gray-500 uppercase">Tổng Folder Đã Quét</p>
+        <p class="text-xs font-medium text-gray-500 uppercase">Tổng ECIS Đã Quét</p>
         <p id="stat-total" class="text-2xl font-bold text-gray-800 mt-1">0</p>
       </div>
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-        <p class="text-xs font-medium text-gray-500 uppercase">Folder Đủ File</p>
+        <p class="text-xs font-medium text-gray-500 uppercase">ECIS Đã Đủ Hồ Sơ (Full)</p>
         <p id="stat-ready" class="text-2xl font-bold text-green-600 mt-1">0</p>
       </div>
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-        <p class="text-xs font-medium text-gray-500 uppercase">Tổng File PDF</p>
-        <p id="stat-pdf" class="text-2xl font-bold text-blue-600 mt-1">0</p>
-      </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-        <p class="text-xs font-medium text-gray-500 uppercase">Tổng File XLS/XLSX</p>
-        <p id="stat-xls" class="text-2xl font-bold text-emerald-600 mt-1">0</p>
+        <p class="text-xs font-medium text-gray-500 uppercase">ECIS Chưa Đủ Hồ Sơ</p>
+        <p id="stat-missing" class="text-2xl font-bold text-amber-600 mt-1">0</p>
       </div>
     </div>
 
     <!-- BỘ LỌC VÀ TÌM KIẾM -->
     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4 justify-between">
-      <input type="text" id="search-input" oninput="filterData()" placeholder="🔍 Tìm theo tên Folder..." 
+      <input type="text" id="search-input" oninput="filterData()" placeholder="🔍 Tìm theo ECIS..." 
              class="w-full md:w-1/3 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
       
       <div class="flex gap-2">
@@ -61,9 +57,9 @@
           <option value="LCL">Chỉ LCL</option>
         </select>
         <select id="status-filter" onchange="filterData()" class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="ALL">Tất cả trạng thái</option>
-          <option value="READY">Đủ File (PDF & XLS > 0)</option>
-          <option value="MISSING">Thiếu File</option>
+          <option value="ALL">Tất cả hồ sơ</option>
+          <option value="FULL">Hồ sơ Full</option>
+          <option value="MISSING">Hồ sơ còn thiếu</option>
         </select>
       </div>
     </div>
@@ -74,10 +70,9 @@
         <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold border-b">
           <tr>
             <th class="py-3 px-4">Loại</th>
-            <th class="py-3 px-4">Tên Folder Con 2</th>
-            <th class="py-3 px-4 text-center">Số File PDF</th>
-            <th class="py-3 px-4 text-center">Số File XLS</th>
-            <th class="py-3 px-4 text-center">Trạng Thái</th>
+            <th class="py-3 px-4">ECIS</th>
+            <th class="py-3 px-4">FILE THIẾU</th>
+            <th class="py-3 px-4">Tờ Khai</th>
             <th class="py-3 px-4 text-right">Cập Nhật Lần Cuối</th>
             <th class="py-3 px-4 text-center">Thao Tác</th>
           </tr>
@@ -94,7 +89,7 @@
   <div id="file-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
       <div class="p-4 border-b flex justify-between items-center">
-        <h3 id="modal-title" class="font-bold text-lg text-slate-800">Danh sách File</h3>
+        <h3 id="modal-title" class="font-bold text-lg text-slate-800">Danh sách File Chi Tiết</h3>
         <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
       </div>
       <div class="p-4 overflow-y-auto space-y-4">
@@ -117,6 +112,55 @@
 
     let globalData = [];
 
+    // Danh sách 7 quy chuẩn kiểm tra đuôi PDF
+    const REQUIRED_PDF_TYPES = [
+      { key: '_BK', label: 'BK' },
+      { key: '_PLX', label: 'PLX' },
+      { key: '_TKN+VAT', label: 'TKN+VAT' },
+      { key: '_B', label: 'B' },
+      { key: '_QTSX', label: 'QTSX' },
+      { key: '_PL', label: 'PL' },
+      { isNumber: true, label: 'INV' } // Kiểm tra dạng _(số).pdf
+    ];
+
+    // LOGIC 1: Phân tích danh sách PDF để tìm file thiếu
+    function getMissingPdfTypes(pdfList) {
+      if (!pdfList || !Array.isArray(pdfList)) pdfList = [];
+
+      let missing = [];
+
+      REQUIRED_PDF_TYPES.forEach(type => {
+        if (type.isNumber) {
+          // Kiểm tra xem có file nào chứa dạng _<chữ số>.pdf không (ví dụ: _06877.pdf)
+          const hasNumberPdf = pdfList.some(file => /_\d+\.pdf$/i.test(file));
+          if (!hasNumberPdf) missing.push(type.label);
+        } else {
+          // Kiểm tra đuôi quy định (không phân biệt hoa thường)
+          const hasType = pdfList.some(file => file.toUpperCase().includes(type.key.toUpperCase() + '.PDF'));
+          if (!hasType) missing.push(type.label);
+        }
+      });
+
+      return missing;
+    }
+
+    // LOGIC 2: Trích xuất chuỗi số Mã Tờ Khai từ danh sách Excel
+    function extractDeclarationNumbers(xlsList) {
+      if (!xlsList || !Array.isArray(xlsList) || xlsList.length === 0) return '---';
+
+      let numbers = [];
+
+      xlsList.forEach(fileName => {
+        // Tìm chuỗi chữ số nằm sau dấu _ hoặc lấy đoạn số có từ 10-12 chữ số
+        const match = fileName.match(/_(\d+)\.(xls|xlsx)$/i) || fileName.match(/(\d{10,12})/);
+        if (match && match[1]) {
+          numbers.push(match[1]);
+        }
+      });
+
+      return numbers.length > 0 ? numbers.join(', ') : '---';
+    }
+
     async function fetchData() {
       const { data, error } = await supabaseClient
         .from('ecis_summary')
@@ -135,10 +179,18 @@
     }
 
     function updateKPIs(data) {
+      let fullCount = 0;
+      let missingCount = 0;
+
+      data.forEach(item => {
+        const missing = getMissingPdfTypes(item.pdf_list);
+        if (missing.length === 0) fullCount++;
+        else missingCount++;
+      });
+
       document.getElementById('stat-total').innerText = data.length;
-      document.getElementById('stat-ready').innerText = data.filter(d => d.pdf_count > 0 && d.xls_count > 0).length;
-      document.getElementById('stat-pdf').innerText = data.reduce((acc, cur) => acc + (cur.pdf_count || 0), 0);
-      document.getElementById('stat-xls').innerText = data.reduce((acc, cur) => acc + (cur.xls_count || 0), 0);
+      document.getElementById('stat-ready').innerText = fullCount;
+      document.getElementById('stat-missing').innerText = missingCount;
     }
 
     function filterData() {
@@ -150,8 +202,9 @@
         const matchSearch = item.folder_name.toLowerCase().includes(search);
         const matchCat = cat === 'ALL' || item.category === cat;
         
-        const isReady = item.pdf_count > 0 && item.xls_count > 0;
-        const matchStatus = status === 'ALL' || (status === 'READY' ? isReady : !isReady);
+        const missing = getMissingPdfTypes(item.pdf_list);
+        const isFull = missing.length === 0;
+        const matchStatus = status === 'ALL' || (status === 'FULL' ? isFull : !isFull);
 
         return matchSearch && matchCat && matchStatus;
       });
@@ -164,16 +217,25 @@
       tbody.innerHTML = '';
 
       if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào.</td></tr>`;
         return;
       }
 
-      data.forEach((item, index) => {
-        const isReady = item.pdf_count > 0 && item.xls_count > 0;
-        const badge = isReady 
-          ? `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-semibold">Đủ File</span>`
-          : `<span class="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-semibold">Thiếu File</span>`;
+      data.forEach((item) => {
+        const missingList = getMissingPdfTypes(item.pdf_list);
+        
+        // Hiển thị Full màu xanh nếu không thiếu file nào, ngược lại hiển thị danh sách file thiếu dạng Badge
+        let missingDisplay = '';
+        if (missingList.length === 0) {
+          missingDisplay = `<span class="bg-green-100 text-green-700 font-bold px-2.5 py-1 rounded text-xs">Full</span>`;
+        } else {
+          missingDisplay = missingList.map(tag => 
+            `<span class="bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded text-xs font-semibold mr-1 inline-block mb-1">${tag}</span>`
+          ).join('');
+        }
 
+        // Mã tờ khai
+        const declarationDisplay = extractDeclarationNumbers(item.xls_list);
         const timeStr = new Date(item.updated_at).toLocaleString('vi-VN');
 
         const tr = document.createElement('tr');
@@ -181,9 +243,8 @@
         tr.innerHTML = `
           <td class="py-3 px-4 font-bold ${item.category === 'FCL' ? 'text-blue-600' : 'text-purple-600'}">${item.category}</td>
           <td class="py-3 px-4 font-medium text-gray-800">${item.folder_name}</td>
-          <td class="py-3 px-4 text-center"><span class="font-semibold text-blue-600">${item.pdf_count}</span></td>
-          <td class="py-3 px-4 text-center"><span class="font-semibold text-emerald-600">${item.xls_count}</span></td>
-          <td class="py-3 px-4 text-center">${badge}</td>
+          <td class="py-3 px-4">${missingDisplay}</td>
+          <td class="py-3 px-4 font-mono text-emerald-700 font-medium">${declarationDisplay}</td>
           <td class="py-3 px-4 text-right text-xs text-gray-500">${timeStr}</td>
           <td class="py-3 px-4 text-center">
             <button onclick="openModal('${item.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded">
@@ -199,9 +260,9 @@
       const item = globalData.find(d => d.id === id);
       if (!item) return;
 
-      document.getElementById('modal-title').innerText = `Folder: ${item.folder_name}`;
-      document.getElementById('modal-pdf-count').innerText = item.pdf_count;
-      document.getElementById('modal-xls-count').innerText = item.xls_count;
+      document.getElementById('modal-title').innerText = `ECIS: ${item.folder_name}`;
+      document.getElementById('modal-pdf-count').innerText = item.pdf_count || 0;
+      document.getElementById('modal-xls-count').innerText = item.xls_count || 0;
 
       const pdfList = document.getElementById('modal-pdf-list');
       pdfList.innerHTML = (item.pdf_list && item.pdf_list.length > 0) 
