@@ -1,0 +1,28 @@
+name: Auto Sync SharePoint to Supabase
+
+on:
+  schedule:
+    # Chạy tự động mỗi 15 phút (Cú pháp Cron)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Cho phép bấm nút chạy thủ công bất kỳ lúc nào
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Sync Script
+        env:
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+        run: node sync.js
