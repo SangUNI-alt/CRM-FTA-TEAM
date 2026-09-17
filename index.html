@@ -22,6 +22,24 @@
     </div>
   </div>
 
+  <!-- THANH THỐNG KÊ (STATISTICS BAR) -->
+  <div class="bg-indigo-900 text-white p-3 rounded-xl shadow mb-4 flex justify-around items-center text-xs border border-indigo-700">
+    <div class="text-center">
+      <span class="text-indigo-200 block text-[10px] uppercase font-bold tracking-wider">Tổng Thư Mục (%ECIS%)</span>
+      <span id="statFolderCount" class="text-base font-extrabold text-yellow-300">0</span>
+    </div>
+    <div class="h-6 w-px bg-indigo-700"></div>
+    <div class="text-center">
+      <span class="text-indigo-200 block text-[10px] uppercase font-bold tracking-wider">File Trong Thư Mục Chọn</span>
+      <span id="statFileCount" class="text-base font-extrabold text-green-300">0</span>
+    </div>
+    <div class="h-6 w-px bg-indigo-700"></div>
+    <div class="text-center">
+      <span class="text-indigo-200 block text-[10px] uppercase font-bold tracking-wider">Dung Lượng Thư Mục Chọn</span>
+      <span id="statTotalSize" class="text-base font-extrabold text-cyan-300">0 MB</span>
+    </div>
+  </div>
+
   <!-- BẢNG 2 CỘT -->
   <div class="flex-1 flex gap-4 overflow-hidden">
     <!-- CỘT TRÁI: DANH SÁCH %ECIS% -->
@@ -109,7 +127,7 @@
       }
     }
 
-    // Chuyển đổi SharePoint Share URL sang định dạng Sharing Token chuẩn cho Graph API
+    // Chuyển đổi SharePoint Share URL sang Sharing Token cho Graph API
     function getSharingUrlToken(url) {
       const base64Value = btoa(unescape(encodeURIComponent(url)));
       return "u!" + base64Value.replace(/=/g, '').replace(/\//g, '_').replace(/\+/g, '-');
@@ -119,34 +137,55 @@
     function getFolderChildrenEndpoint(target) {
       if (target.startsWith("http://") || target.startsWith("https://")) {
         const shareToken = getSharingUrlToken(target);
-        return `https://graph.microsoft.com/v1.0/shares/${shareToken}/driveItem/children?$filter=folder ne null`;
+        return `https://graph.microsoft.com/v1.0/shares/${shareToken}/driveItem/children?$top=200&$filter=folder ne null`;
       } else {
-        return `https://graph.microsoft.com/v1.0/me/drive/items/${target}/children?$filter=folder ne null`;
+        return `https://graph.microsoft.com/v1.0/me/drive/items/${target}/children?$top=200&$filter=folder ne null`;
       }
     }
 
-    // Lấy toàn bộ thư mục con (%ECIS%)
-    async function loadEcisFolders() {
-      const container = document.getElementById('ecisListContainer');
-      container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Đang tải dữ liệu từ Cloud...</div>';
+    // Hàm gọi API quét sạch 100% dữ liệu dù có bao nhiêu trang (Paging Loop)
+    async function fetchAllPages(initialUrl) {
+      let results = [];
+      let nextUrl = initialUrl;
 
-      const url = getFolderChildrenEndpoint(PARENT_FOLDER_ID);
-      
-      try {
-        const res = await fetch(url, {
+      while (nextUrl) {
+        const res = await fetch(nextUrl, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         const data = await res.json();
-        
+
         if (data.error) {
           throw new Error(data.error.message);
         }
 
-        ecisData = data.value || [];
+        if (data.value) {
+          results = results.concat(data.value);
+        }
+
+        // Tự động lấy link trang kế tiếp nếu còn dữ liệu
+        nextUrl = data['@odata.nextLink'] || null;
+      }
+
+      return results;
+    }
+
+    // Lấy TOÀN BỘ thư mục con (%ECIS%) không bỏ sót
+    async function loadEcisFolders() {
+      const container = document.getElementById('ecisListContainer');
+      container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">⏳ Đang quét toàn bộ dữ liệu Folder (vui lòng chờ)...</div>';
+
+      const initialUrl = getFolderChildrenEndpoint(PARENT_FOLDER_ID);
+      
+      try {
+        ecisData = await fetchAllPages(initialUrl);
+        
+        // Cập nhật thống kê số lượng Folder
+        document.getElementById('statFolderCount').innerText = ecisData.length.toLocaleString('vi-VN');
+
         renderEcisList(ecisData);
       } catch (err) {
         console.error("Lỗi lấy dữ liệu:", err);
-        container.innerHTML = `<div class="text-center py-10 text-red-500 text-sm p-2">❌ Lỗi tải folder: ${err.message}<br><span class="text-xs text-gray-500">Nếu link SharePoint lỗi, vui lòng thay bằng Item ID của folder.</span></div>`;
+        container.innerHTML = `<div class="text-center py-10 text-red-500 text-sm p-2">❌ Lỗi tải folder: ${err.message}</div>`;
       }
     }
 
@@ -172,20 +211,23 @@
       });
     }
 
-    // Lấy danh sách File trong thư mục con được chọn
+    // Lấy TOÀN BỘ File trong thư mục con được chọn
     async function loadFilesForEcis(folderId, folderName) {
       document.getElementById('selectedEcisTitle').innerText = `📂 %ECIS%: ${folderName}`;
       const container = document.getElementById('fileListContainer');
-      container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Đang đọc danh sách file...</div>';
+      container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">⏳ Đang lấy toàn bộ file...</div>';
 
-      const url = `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children?$filter=folder eq null`;
+      const initialUrl = `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children?$top=200&$filter=folder eq null`;
       
       try {
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        });
-        const data = await res.json();
-        const files = data.value || [];
+        const files = await fetchAllPages(initialUrl);
+
+        // Tính tổng dung lượng file
+        const totalSizeBytes = files.reduce((sum, file) => sum + (file.size || 0), 0);
+        
+        // Cập nhật thống kê
+        document.getElementById('statFileCount').innerText = files.length.toLocaleString('vi-VN');
+        document.getElementById('statTotalSize').innerText = formatBytes(totalSizeBytes);
 
         container.innerHTML = '';
         if (files.length === 0) {
