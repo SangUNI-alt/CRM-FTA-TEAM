@@ -72,6 +72,8 @@
         <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold border-b">
           <tr>
             <th class="py-3 px-4">Loại</th>
+            <th class="py-3 px-4 text-center">Date PL</th>
+            <th class="py-3 px-4">Country</th>
             <th class="py-3 px-4">ECIS</th>
             <th class="py-3 px-4">FILE THIẾU</th>
             <th class="py-3 px-4">Tờ Khai</th>
@@ -120,29 +122,17 @@
 
       let missing = [];
 
-      // 1. Kiểm tra _BK
       if (!pdfList.some(f => f.toUpperCase().includes('_BK.PDF'))) missing.push('BK');
-
-      // 2. Kiểm tra _PLX
       if (!pdfList.some(f => f.toUpperCase().includes('_PLX.PDF'))) missing.push('PLX');
-
-      // 3. Kiểm tra _TKN+VAT
       if (!pdfList.some(f => f.toUpperCase().includes('_TKN+VAT.PDF'))) missing.push('TKN+VAT');
 
-      // 4. Kiểm tra _B (với FCL) HOẶC _FCR (với LCL) -> Hiển thị nhãn 'B' nếu thiếu
       const isLCL = (category && category.toUpperCase() === 'LCL');
       const billKey = isLCL ? '_FCR.PDF' : '_B.PDF';
-      if (!pdfList.some(f => f.toUpperCase().includes(billKey))) {
-        missing.push('B');
-      }
+      if (!pdfList.some(f => f.toUpperCase().includes(billKey))) missing.push('B');
 
-      // 5. Kiểm tra _QTSX
       if (!pdfList.some(f => f.toUpperCase().includes('_QTSX.PDF'))) missing.push('QTSX');
-
-      // 6. Kiểm tra _PL
       if (!pdfList.some(f => f.toUpperCase().includes('_PL.PDF'))) missing.push('PL');
 
-      // 7. Kiểm tra dạng file _<chữ số>.pdf (INV)
       const hasNumberPdf = pdfList.some(f => /_\d+\.pdf$/i.test(f));
       if (!hasNumberPdf) missing.push('INV');
 
@@ -154,7 +144,6 @@
       if (!xlsList || !Array.isArray(xlsList) || xlsList.length === 0) return '---';
 
       let numbers = [];
-
       xlsList.forEach(fileName => {
         const match = fileName.match(/_(\d+)\.(xls|xlsx)$/i) || fileName.match(/(\d{10,12})/);
         if (match && match[1]) {
@@ -202,7 +191,6 @@
       const cat = document.getElementById('category-filter').value;
       const status = document.getElementById('status-filter').value;
 
-      // Xử lý chuỗi tìm kiếm nhiều ECIS (Tách theo xuống dòng, dấu phẩy, khoảng trắng)
       const searchTerms = rawSearch
         .split(/[\n,\s]+/)
         .map(term => term.trim().toLowerCase())
@@ -211,7 +199,6 @@
       const filtered = globalData.filter(item => {
         const folderNameLower = item.folder_name.toLowerCase();
 
-        // Kiểm tra khớp từ khóa tìm kiếm (Khớp bất kỳ từ khóa nào trong danh sách)
         let matchSearch = true;
         if (searchTerms.length > 0) {
           matchSearch = searchTerms.some(term => folderNameLower.includes(term));
@@ -234,7 +221,7 @@
       tbody.innerHTML = '';
 
       if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào.</td></tr>`;
         return;
       }
 
@@ -253,10 +240,16 @@
         const declarationDisplay = extractDeclarationNumbers(item.xls_list);
         const timeStr = new Date(item.updated_at).toLocaleString('vi-VN');
 
+        // Giá trị mới từ PL
+        const plDateDisplay = item.pl_date || '---';
+        const countryDisplay = item.country || '---';
+
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50 transition border-b";
         tr.innerHTML = `
           <td class="py-3 px-4 font-bold ${item.category === 'FCL' ? 'text-blue-600' : 'text-purple-600'}">${item.category}</td>
+          <td class="py-3 px-4 text-center font-semibold text-slate-700 bg-slate-50/50">${plDateDisplay}</td>
+          <td class="py-3 px-4 font-semibold text-indigo-700 uppercase">${countryDisplay}</td>
           <td class="py-3 px-4 font-medium text-gray-800">${item.folder_name}</td>
           <td class="py-3 px-4">${missingDisplay}</td>
           <td class="py-3 px-4 font-mono text-emerald-700 font-medium">${declarationDisplay}</td>
