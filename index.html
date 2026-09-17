@@ -2,182 +2,236 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>CRM ECIS Explorer - M365 (Superfast DB)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECIS Dashboard - CRM Management</title>
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Supabase JS Client -->
+  <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-gray-100 p-4 h-screen flex flex-col font-sans">
+<body class="bg-gray-100 text-gray-800 font-sans antialiased">
 
-  <!-- HEADER -->
-  <div class="bg-white p-4 rounded-xl shadow-md mb-4 flex justify-between items-center border">
-    <div>
-      <h1 class="text-xl font-bold text-indigo-700">CRM ECIS Explorer (Cloud Database)</h1>
-      <p class="text-xs text-gray-500">Tải dữ liệu tức thì từ Supabase Cloud</p>
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+      <div>
+        <h1 class="text-3xl font-bold text-slate-800">Quản Lý Thư Mục ECIS 2026</h1>
+        <p class="text-sm text-gray-500 mt-1">Theo dõi số lượng chứng từ PDF và bảng kê XLS/XLSX thời gian thực</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <span class="w-2 h-2 mr-2 bg-green-500 rounded-full animate-ping"></span> Realtime Active
+        </span>
+        <button onclick="fetchData()" class="bg-slate-800 hover:bg-slate-700 text-white text-sm px-4 py-2 rounded-lg transition">
+          🔄 Tải lại
+        </button>
+      </div>
     </div>
-    <div id="userInfo" class="text-xs">
-      <span class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg border font-semibold">⚡ Trực tuyến (Real-time DB)</span>
+
+    <!-- KPI STATS CARDS -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+        <p class="text-xs font-medium text-gray-500 uppercase">Tổng Folder Đã Quét</p>
+        <p id="stat-total" class="text-2xl font-bold text-gray-800 mt-1">0</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+        <p class="text-xs font-medium text-gray-500 uppercase">Folder Đủ File</p>
+        <p id="stat-ready" class="text-2xl font-bold text-green-600 mt-1">0</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+        <p class="text-xs font-medium text-gray-500 uppercase">Tổng File PDF</p>
+        <p id="stat-pdf" class="text-2xl font-bold text-blue-600 mt-1">0</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+        <p class="text-xs font-medium text-gray-500 uppercase">Tổng File XLS/XLSX</p>
+        <p id="stat-xls" class="text-2xl font-bold text-emerald-600 mt-1">0</p>
+      </div>
     </div>
+
+    <!-- BỘ LỌC VÀ TÌM KIẾM -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4 justify-between">
+      <input type="text" id="search-input" oninput="filterData()" placeholder="🔍 Tìm theo tên Folder..." 
+             class="w-full md:w-1/3 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      
+      <div class="flex gap-2">
+        <select id="category-filter" onchange="filterData()" class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="ALL">Tất cả loại (FCL/LCL)</option>
+          <option value="FCL">Chỉ FCL</option>
+          <option value="LCL">Chỉ LCL</option>
+        </select>
+        <select id="status-filter" onchange="filterData()" class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="ALL">Tất cả trạng thái</option>
+          <option value="READY">Đủ File (PDF & XLS > 0)</option>
+          <option value="MISSING">Thiếu File</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- BẢNG DỮ LIỆU TỔNG HỢP -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <table class="w-full text-left border-collapse text-sm">
+        <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold border-b">
+          <tr>
+            <th class="py-3 px-4">Loại</th>
+            <th class="py-3 px-4">Tên Folder Con 2</th>
+            <th class="py-3 px-4 text-center">Số File PDF</th>
+            <th class="py-3 px-4 text-center">Số File XLS</th>
+            <th class="py-3 px-4 text-center">Trạng Thái</th>
+            <th class="py-3 px-4 text-right">Cập Nhật Lần Cuối</th>
+            <th class="py-3 px-4 text-center">Thao Tác</th>
+          </tr>
+        </thead>
+        <tbody id="table-body" class="divide-y divide-gray-100">
+          <!-- Dữ liệu render bằng JS -->
+        </tbody>
+      </table>
+    </div>
+
   </div>
 
-  <!-- THANH THỐNG KÊ (STATISTICS BAR) -->
-  <div class="bg-indigo-900 text-white p-3 rounded-xl shadow mb-4 flex justify-around items-center text-xs border border-indigo-700">
-    <div class="text-center">
-      <span class="text-indigo-200 block text-[10px] uppercase font-bold tracking-wider">Tổng Thư Mục (%ECIS%)</span>
-      <span id="statFolderCount" class="text-base font-extrabold text-yellow-300">0</span>
-    </div>
-    <div class="h-6 w-px bg-indigo-700"></div>
-    <div class="text-center">
-      <span class="text-indigo-200 block text-[10px] uppercase font-bold tracking-wider">File Trong Thư Mục Chọn</span>
-      <span id="statFileCount" class="text-base font-extrabold text-green-300">0</span>
-    </div>
-    <div class="h-6 w-px bg-indigo-700"></div>
-    <div class="text-center">
-      <span class="text-indigo-200 block text-[10px] uppercase font-bold tracking-wider">Dung Lượng Thư Mục Chọn</span>
-      <span id="statTotalSize" class="text-base font-extrabold text-cyan-300">0 MB</span>
-    </div>
-  </div>
-
-  <!-- BẢNG 2 CỘT -->
-  <div class="flex-1 flex gap-4 overflow-hidden">
-    <!-- CỘT TRÁI: DANH SÁCH %ECIS% -->
-    <div class="w-1/2 bg-white rounded-xl shadow-md p-4 flex flex-col border">
-      <div class="pb-3 border-b mb-3 flex justify-between items-center">
-        <h2 class="font-bold text-gray-700">📂 Danh Sách Thư Mục Con (%ECIS%)</h2>
-        <input type="text" id="searchEcis" onkeyup="filterEcis()" placeholder="Tìm %ECIS%..." class="p-1.5 border rounded text-xs w-36 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+  <!-- MODAL XEM CHI TIẾT FILE -->
+  <div id="file-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h3 id="modal-title" class="font-bold text-lg text-slate-800">Danh sách File</h3>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
       </div>
-      <div class="flex-1 overflow-y-auto" id="ecisListContainer">
-        <div class="text-center py-10 text-gray-400 text-sm">Đang tải dữ liệu...</div>
-      </div>
-    </div>
-
-    <!-- CỘT PHẢI: DANH SÁCH FILE -->
-    <div class="w-1/2 bg-white rounded-xl shadow-md p-4 flex flex-col border">
-      <div class="pb-3 border-b mb-3">
-        <h2 id="selectedEcisTitle" class="font-bold text-indigo-600">Chưa chọn %ECIS% nào</h2>
-        <p class="text-xs text-gray-400">Chọn 1 thư mục bên trái để xem file</p>
-      </div>
-      <div class="flex-1 overflow-y-auto" id="fileListContainer">
-        <div class="text-center py-10 text-gray-400 text-sm">Chưa có dữ liệu file</div>
+      <div class="p-4 overflow-y-auto space-y-4">
+        <div>
+          <h4 class="font-semibold text-blue-600 text-sm mb-2">📄 Danh sách File PDF (<span id="modal-pdf-count">0</span>):</h4>
+          <ul id="modal-pdf-list" class="list-disc pl-5 text-sm space-y-1 text-gray-700 bg-blue-50 p-3 rounded-lg"></ul>
+        </div>
+        <div>
+          <h4 class="font-semibold text-emerald-600 text-sm mb-2">📊 Danh sách File Excel (<span id="modal-xls-count">0</span>):</h4>
+          <ul id="modal-xls-list" class="list-disc pl-5 text-sm space-y-1 text-gray-700 bg-emerald-50 p-3 rounded-lg"></ul>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    // =========================================================
-    // CẤU HÌNH SUPABASE CỦA BẠN
-    // =========================================================
-    const SUPABASE_URL = "https://eggshqsdtieqzjtttdyh.supabase.co";
+    const SUPABASE_URL = "https://eggshqsdrieqzjtttdyh.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZ3NocXNkcmllcXpqdHR0ZHloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MjQ5MDMsImV4cCI6MjEwNTIwMDkwM30.7hgv-vm2GDL3xEa3IvFWfrtynCzWWlWDBDgLMrbuKw4";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    let ecisData = [];
+    let globalData = [];
 
-    // Tự động tải dữ liệu ngay khi vừa load web (Tốc độ siêu nhanh)
-    window.addEventListener('DOMContentLoaded', () => {
-      loadEcisFolders();
-    });
-
-    // Lấy toàn bộ Folder (%ECIS%) từ Supabase DB
-    async function loadEcisFolders() {
-      const container = document.getElementById('ecisListContainer');
-
-      const { data, error } = await supabase
-        .from('ecis_items')
+    async function fetchData() {
+      const { data, error } = await supabaseClient
+        .from('ecis_summary')
         .select('*')
-        .eq('is_folder', true)
-        .order('name', { ascending: true });
+        .order('category', { ascending: true })
+        .order('folder_name', { ascending: true });
 
       if (error) {
-        console.error("Lỗi DB:", error);
-        container.innerHTML = `<div class="text-center py-10 text-red-500 text-sm">Lỗi tải DB: ${error.message}</div>`;
+        alert("Lỗi tải dữ liệu: " + error.message);
         return;
       }
 
-      ecisData = data || [];
-      document.getElementById('statFolderCount').innerText = ecisData.length.toLocaleString('vi-VN');
-      renderEcisList(ecisData);
+      globalData = data || [];
+      updateKPIs(globalData);
+      filterData();
     }
 
-    function renderEcisList(folders) {
-      const container = document.getElementById('ecisListContainer');
-      container.innerHTML = '';
+    function updateKPIs(data) {
+      document.getElementById('stat-total').innerText = data.length;
+      document.getElementById('stat-ready').innerText = data.filter(d => d.pdf_count > 0 && d.xls_count > 0).length;
+      document.getElementById('stat-pdf').innerText = data.reduce((acc, cur) => acc + (cur.pdf_count || 0), 0);
+      document.getElementById('stat-xls').innerText = data.reduce((acc, cur) => acc + (cur.xls_count || 0), 0);
+    }
 
-      if (folders.length === 0) {
-        container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Chưa có dữ liệu thư mục trong Database.</div>';
+    function filterData() {
+      const search = document.getElementById('search-input').value.toLowerCase();
+      const cat = document.getElementById('category-filter').value;
+      const status = document.getElementById('status-filter').value;
+
+      const filtered = globalData.filter(item => {
+        const matchSearch = item.folder_name.toLowerCase().includes(search);
+        const matchCat = cat === 'ALL' || item.category === cat;
+        
+        const isReady = item.pdf_count > 0 && item.xls_count > 0;
+        const matchStatus = status === 'ALL' || (status === 'READY' ? isReady : !isReady);
+
+        return matchSearch && matchCat && matchStatus;
+      });
+
+      renderTable(filtered);
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào.</td></tr>`;
         return;
       }
 
-      folders.forEach(folder => {
-        container.innerHTML += `
-          <div onclick="loadFilesForEcis('${folder.id}', '${escapeJsString(folder.name)}')" class="p-3 hover:bg-indigo-50 border-b cursor-pointer flex justify-between items-center transition">
-            <div class="flex items-center gap-2 overflow-hidden">
-              <span class="text-xs bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded flex-none">%ECIS%</span>
-              <span class="font-medium text-gray-800 text-sm truncate">${folder.name}</span>
-            </div>
-            <span class="text-xs text-gray-400 flex-none">📂 Thư mục</span>
-          </div>
+      data.forEach((item, index) => {
+        const isReady = item.pdf_count > 0 && item.xls_count > 0;
+        const badge = isReady 
+          ? `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-semibold">Đủ File</span>`
+          : `<span class="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-semibold">Thiếu File</span>`;
+
+        const timeStr = new Date(item.updated_at).toLocaleString('vi-VN');
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b";
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-bold ${item.category === 'FCL' ? 'text-blue-600' : 'text-purple-600'}">${item.category}</td>
+          <td class="py-3 px-4 font-medium text-gray-800">${item.folder_name}</td>
+          <td class="py-3 px-4 text-center"><span class="font-semibold text-blue-600">${item.pdf_count}</span></td>
+          <td class="py-3 px-4 text-center"><span class="font-semibold text-emerald-600">${item.xls_count}</span></td>
+          <td class="py-3 px-4 text-center">${badge}</td>
+          <td class="py-3 px-4 text-right text-xs text-gray-500">${timeStr}</td>
+          <td class="py-3 px-4 text-center">
+            <button onclick="openModal('${item.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded">
+              🔍 Xem File
+            </button>
+          </td>
         `;
+        tbody.appendChild(tr);
       });
     }
 
-    // Lấy danh sách File của thư mục từ DB
-    async function loadFilesForEcis(folderId, folderName) {
-      document.getElementById('selectedEcisTitle').innerText = `📂 %ECIS%: ${folderName}`;
-      const container = document.getElementById('fileListContainer');
+    function openModal(id) {
+      const item = globalData.find(d => d.id === id);
+      if (!item) return;
 
-      const { data: files, error } = await supabase
-        .from('ecis_items')
-        .select('*')
-        .eq('parent_id', folderId)
-        .eq('is_folder', false)
-        .order('name', { ascending: true });
+      document.getElementById('modal-title').innerText = `Folder: ${item.folder_name}`;
+      document.getElementById('modal-pdf-count').innerText = item.pdf_count;
+      document.getElementById('modal-xls-count').innerText = item.xls_count;
 
-      if (error) {
-        container.innerHTML = `<div class="text-center py-10 text-red-500 text-sm">Lỗi tải file: ${error.message}</div>`;
-        return;
-      }
+      const pdfList = document.getElementById('modal-pdf-list');
+      pdfList.innerHTML = (item.pdf_list && item.pdf_list.length > 0) 
+        ? item.pdf_list.map(f => `<li>${f}</li>`).join('')
+        : `<li class="text-gray-400 italic">Không có file PDF</li>`;
 
-      const totalSizeBytes = (files || []).reduce((sum, file) => sum + (Number(file.size) || 0), 0);
-      document.getElementById('statFileCount').innerText = (files || []).length.toLocaleString('vi-VN');
-      document.getElementById('statTotalSize').innerText = formatBytes(totalSizeBytes);
+      const xlsList = document.getElementById('modal-xls-list');
+      xlsList.innerHTML = (item.xls_list && item.xls_list.length > 0)
+        ? item.xls_list.map(f => `<li>${f}</li>`).join('')
+        : `<li class="text-gray-400 italic">Không có file Excel</li>`;
 
-      container.innerHTML = '';
-      if (!files || files.length === 0) {
-        container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Thư mục này chưa có file.</div>';
-        return;
-      }
-
-      files.forEach(file => {
-        container.innerHTML += `
-          <div class="p-3 bg-gray-50 rounded-lg mb-2 border hover:shadow-sm transition flex justify-between items-center">
-            <div class="overflow-hidden pr-2">
-              <div class="font-semibold text-gray-800 text-sm truncate">📄 ${file.name}</div>
-              <div class="text-xs text-gray-400">${formatBytes(file.size)}</div>
-            </div>
-            <a href="${file.web_url}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 font-medium flex-none">Mở File</a>
-          </div>
-        `;
-      });
+      document.getElementById('file-modal').classList.remove('hidden');
+      document.getElementById('file-modal').classList.add('flex');
     }
 
-    function filterEcis() {
-      const keyword = document.getElementById('searchEcis').value.toLowerCase();
-      const filtered = ecisData.filter(item => item.name.toLowerCase().includes(keyword));
-      renderEcisList(filtered);
+    function closeModal() {
+      document.getElementById('file-modal').classList.add('hidden');
+      document.getElementById('file-modal').classList.remove('flex');
     }
 
-    function formatBytes(bytes) {
-      if (!bytes || bytes === 0) return '0 Bytes';
-      const k = 1024;
-      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-    }
+    // KÍCH HOẠT REALTIME
+    supabaseClient
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ecis_summary' }, () => {
+        fetchData();
+      })
+      .subscribe();
 
-    function escapeJsString(str) {
-      return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
-    }
+    // Tải dữ liệu ban đầu
+    fetchData();
   </script>
 </body>
 </html>
