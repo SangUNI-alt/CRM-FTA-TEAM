@@ -46,11 +46,13 @@
     </div>
 
     <!-- BỘ LỌC VÀ TÌM KIẾM -->
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4 justify-between">
-      <input type="text" id="search-input" oninput="filterData()" placeholder="🔍 Tìm theo ECIS..." 
-             class="w-full md:w-1/3 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4 justify-between items-start">
+      <div class="w-full md:w-1/2">
+        <textarea id="search-input" oninput="filterData()" rows="2" placeholder="🔍 Tìm kiếm ECIS (Hỗ trợ nhập/dán nhiều mã phân cách bằng xuống dòng hoặc dấu phẩy)..." 
+               class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+      </div>
       
-      <div class="flex gap-2">
+      <div class="flex gap-2 w-full md:w-auto">
         <select id="category-filter" onchange="filterData()" class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="ALL">Tất cả loại (FCL/LCL)</option>
           <option value="FCL">Chỉ FCL</option>
@@ -112,46 +114,48 @@
 
     let globalData = [];
 
-    // Danh sách 7 quy chuẩn kiểm tra đuôi PDF
-    const REQUIRED_PDF_TYPES = [
-      { key: '_BK', label: 'BK' },
-      { key: '_PLX', label: 'PLX' },
-      { key: '_TKN+VAT', label: 'TKN+VAT' },
-      { key: '_B', label: 'B' },
-      { key: '_QTSX', label: 'QTSX' },
-      { key: '_PL', label: 'PL' },
-      { isNumber: true, label: 'INV' } // Kiểm tra dạng _(số).pdf
-    ];
-
-    // LOGIC 1: Phân tích danh sách PDF để tìm file thiếu
-    function getMissingPdfTypes(pdfList) {
+    // LOGIC 1: Kiểm tra danh sách file PDF thiếu (Phân biệt FCL và LCL)
+    function getMissingPdfTypes(pdfList, category) {
       if (!pdfList || !Array.isArray(pdfList)) pdfList = [];
 
       let missing = [];
 
-      REQUIRED_PDF_TYPES.forEach(type => {
-        if (type.isNumber) {
-          // Kiểm tra xem có file nào chứa dạng _<chữ số>.pdf không (ví dụ: _06877.pdf)
-          const hasNumberPdf = pdfList.some(file => /_\d+\.pdf$/i.test(file));
-          if (!hasNumberPdf) missing.push(type.label);
-        } else {
-          // Kiểm tra đuôi quy định (không phân biệt hoa thường)
-          const hasType = pdfList.some(file => file.toUpperCase().includes(type.key.toUpperCase() + '.PDF'));
-          if (!hasType) missing.push(type.label);
-        }
-      });
+      // 1. Kiểm tra _BK
+      if (!pdfList.some(f => f.toUpperCase().includes('_BK.PDF'))) missing.push('BK');
+
+      // 2. Kiểm tra _PLX
+      if (!pdfList.some(f => f.toUpperCase().includes('_PLX.PDF'))) missing.push('PLX');
+
+      // 3. Kiểm tra _TKN+VAT
+      if (!pdfList.some(f => f.toUpperCase().includes('_TKN+VAT.PDF'))) missing.push('TKN+VAT');
+
+      // 4. Kiểm tra _B (với FCL) HOẶC _FCR (với LCL) -> Hiển thị nhãn 'B' nếu thiếu
+      const isLCL = (category && category.toUpperCase() === 'LCL');
+      const billKey = isLCL ? '_FCR.PDF' : '_B.PDF';
+      if (!pdfList.some(f => f.toUpperCase().includes(billKey))) {
+        missing.push('B');
+      }
+
+      // 5. Kiểm tra _QTSX
+      if (!pdfList.some(f => f.toUpperCase().includes('_QTSX.PDF'))) missing.push('QTSX');
+
+      // 6. Kiểm tra _PL
+      if (!pdfList.some(f => f.toUpperCase().includes('_PL.PDF'))) missing.push('PL');
+
+      // 7. Kiểm tra dạng file _<chữ số>.pdf (INV)
+      const hasNumberPdf = pdfList.some(f => /_\d+\.pdf$/i.test(f));
+      if (!hasNumberPdf) missing.push('INV');
 
       return missing;
     }
 
-    // LOGIC 2: Trích xuất chuỗi số Mã Tờ Khai từ danh sách Excel
+    // LOGIC 2: Trích xuất Mã Tờ Khai từ Excel
     function extractDeclarationNumbers(xlsList) {
       if (!xlsList || !Array.isArray(xlsList) || xlsList.length === 0) return '---';
 
       let numbers = [];
 
       xlsList.forEach(fileName => {
-        // Tìm chuỗi chữ số nằm sau dấu _ hoặc lấy đoạn số có từ 10-12 chữ số
         const match = fileName.match(/_(\d+)\.(xls|xlsx)$/i) || fileName.match(/(\d{10,12})/);
         if (match && match[1]) {
           numbers.push(match[1]);
@@ -183,7 +187,7 @@
       let missingCount = 0;
 
       data.forEach(item => {
-        const missing = getMissingPdfTypes(item.pdf_list);
+        const missing = getMissingPdfTypes(item.pdf_list, item.category);
         if (missing.length === 0) fullCount++;
         else missingCount++;
       });
@@ -194,15 +198,28 @@
     }
 
     function filterData() {
-      const search = document.getElementById('search-input').value.toLowerCase();
+      const rawSearch = document.getElementById('search-input').value;
       const cat = document.getElementById('category-filter').value;
       const status = document.getElementById('status-filter').value;
 
+      // Xử lý chuỗi tìm kiếm nhiều ECIS (Tách theo xuống dòng, dấu phẩy, khoảng trắng)
+      const searchTerms = rawSearch
+        .split(/[\n,\s]+/)
+        .map(term => term.trim().toLowerCase())
+        .filter(term => term.length > 0);
+
       const filtered = globalData.filter(item => {
-        const matchSearch = item.folder_name.toLowerCase().includes(search);
+        const folderNameLower = item.folder_name.toLowerCase();
+
+        // Kiểm tra khớp từ khóa tìm kiếm (Khớp bất kỳ từ khóa nào trong danh sách)
+        let matchSearch = true;
+        if (searchTerms.length > 0) {
+          matchSearch = searchTerms.some(term => folderNameLower.includes(term));
+        }
+
         const matchCat = cat === 'ALL' || item.category === cat;
         
-        const missing = getMissingPdfTypes(item.pdf_list);
+        const missing = getMissingPdfTypes(item.pdf_list, item.category);
         const isFull = missing.length === 0;
         const matchStatus = status === 'ALL' || (status === 'FULL' ? isFull : !isFull);
 
@@ -217,14 +234,13 @@
       tbody.innerHTML = '';
 
       if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
         return;
       }
 
       data.forEach((item) => {
-        const missingList = getMissingPdfTypes(item.pdf_list);
+        const missingList = getMissingPdfTypes(item.pdf_list, item.category);
         
-        // Hiển thị Full màu xanh nếu không thiếu file nào, ngược lại hiển thị danh sách file thiếu dạng Badge
         let missingDisplay = '';
         if (missingList.length === 0) {
           missingDisplay = `<span class="bg-green-100 text-green-700 font-bold px-2.5 py-1 rounded text-xs">Full</span>`;
@@ -234,7 +250,6 @@
           ).join('');
         }
 
-        // Mã tờ khai
         const declarationDisplay = extractDeclarationNumbers(item.xls_list);
         const timeStr = new Date(item.updated_at).toLocaleString('vi-VN');
 
