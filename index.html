@@ -49,7 +49,7 @@
 
   <script>
     // =========================================================
-    // CẤU HÌNH THÔNG TIN THAY THẾ
+    // THÔNG TIN CẤU HÌNH CỦA BẠN
     // =========================================================
     const CLIENT_ID = "1f5c6852-079c-463a-8fc8-e814359698ee";
     const TENANT_ID = "a70e2894-d043-4c2d-b843-b376e7e7df4b";
@@ -60,33 +60,36 @@
     let ecisData = [];
     let msalInstance = null;
 
-    // Khởi tạo Microsoft Teams Client SDK
-    microsoftTeams.app.initialize().then(() => {
-      initMsal();
-    }).catch(err => {
-      // Trường hợp chạy ngoài ứng dụng Teams (chạy trực tiếp trình duyệt)
-      initMsal();
-    });
-
-    function initMsal() {
-      const msalConfig = {
-        auth: { 
-          clientId: CLIENT_ID, 
-          authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-          redirectUri: REDIRECT_URI
-        },
-        cache: {
-          cacheLocation: "localStorage",
-          storeAuthStateInCookie: true
+    // Tự động khởi chạy khi trang web tải xong
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        if (window.microsoftTeams) {
+          await microsoftTeams.app.initialize().catch(() => {});
         }
-      };
-      
-      msalInstance = new msal.PublicClientApplication(msalConfig);
+        
+        const msalConfig = {
+          auth: { 
+            clientId: CLIENT_ID, 
+            authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+            redirectUri: REDIRECT_URI
+          },
+          cache: {
+            cacheLocation: "localStorage",
+            storeAuthStateInCookie: true
+          }
+        };
 
-      // Thêm nút bấm đăng nhập thủ công tránh bị rào cản Pop-up Blocker
-      const userInfoEl = document.getElementById('userInfo');
-      userInfoEl.innerHTML = `<button onclick="getToken()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg shadow text-xs transition">🔑 Đăng Nhập M365</button>`;
-    }
+        msalInstance = new msal.PublicClientApplication(msalConfig);
+        await msalInstance.initialize();
+
+        const userInfoEl = document.getElementById('userInfo');
+        userInfoEl.innerHTML = `<button onclick="getToken()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg shadow text-xs transition">🔑 Đăng Nhập M365</button>`;
+
+      } catch (err) {
+        console.error("Lỗi khởi tạo:", err);
+        document.getElementById('userInfo').innerHTML = `<span class="text-red-500 font-bold text-xs">❌ Lỗi khởi tạo JS</span>`;
+      }
+    });
 
     async function getToken() {
       const userInfoEl = document.getElementById('userInfo');
@@ -99,7 +102,6 @@
         accessToken = response.accessToken;
         userInfoEl.innerHTML = `<span class="bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 font-semibold text-xs">👤 ${response.account.username}</span>`;
         
-        // Đăng nhập thành công -> Tải danh sách thư mục con
         loadEcisFolders();
       } catch (err) {
         console.error("Lỗi xác thực:", err);
@@ -107,24 +109,44 @@
       }
     }
 
-    // Gọi Microsoft Graph API lấy toàn bộ Thư Mục Con (%ECIS%)
+    // Chuyển đổi SharePoint Share URL sang định dạng Sharing Token chuẩn cho Graph API
+    function getSharingUrlToken(url) {
+      const base64Value = btoa(unescape(encodeURIComponent(url)));
+      return "u!" + base64Value.replace(/=/g, '').replace(/\//g, '_').replace(/\+/g, '-');
+    }
+
+    // Lấy URL cho API Endpoint
+    function getFolderChildrenEndpoint(target) {
+      if (target.startsWith("http://") || target.startsWith("https://")) {
+        const shareToken = getSharingUrlToken(target);
+        return `https://graph.microsoft.com/v1.0/shares/${shareToken}/driveItem/children?$filter=folder ne null`;
+      } else {
+        return `https://graph.microsoft.com/v1.0/me/drive/items/${target}/children?$filter=folder ne null`;
+      }
+    }
+
+    // Lấy toàn bộ thư mục con (%ECIS%)
     async function loadEcisFolders() {
       const container = document.getElementById('ecisListContainer');
       container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Đang tải dữ liệu từ Cloud...</div>';
 
-      const url = `https://graph.microsoft.com/v1.0/me/drive/items/${PARENT_FOLDER_ID}/children?$filter=folder ne null`;
+      const url = getFolderChildrenEndpoint(PARENT_FOLDER_ID);
       
       try {
         const res = await fetch(url, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         const data = await res.json();
-        ecisData = data.value || [];
+        
+        if (data.error) {
+          throw new Error(data.error.message);
+        }
 
+        ecisData = data.value || [];
         renderEcisList(ecisData);
       } catch (err) {
         console.error("Lỗi lấy dữ liệu:", err);
-        container.innerHTML = '<div class="text-center py-10 text-red-500 text-sm">Không thể tải dữ liệu folder. Kiểm tra PARENT_FOLDER_ID.</div>';
+        container.innerHTML = `<div class="text-center py-10 text-red-500 text-sm p-2">❌ Lỗi tải folder: ${err.message}<br><span class="text-xs text-gray-500">Nếu link SharePoint lỗi, vui lòng thay bằng Item ID của folder.</span></div>`;
       }
     }
 
@@ -150,7 +172,7 @@
       });
     }
 
-    // Khi chọn 1 %ECIS% -> Gọi Graph API lấy danh sách File bên trong
+    // Lấy danh sách File trong thư mục con được chọn
     async function loadFilesForEcis(folderId, folderName) {
       document.getElementById('selectedEcisTitle').innerText = `📂 %ECIS%: ${folderName}`;
       const container = document.getElementById('fileListContainer');
@@ -188,16 +210,14 @@
       }
     }
 
-    // Lọc dữ liệu nhanh
     function filterEcis() {
       const keyword = document.getElementById('searchEcis').value.toLowerCase();
       const filtered = ecisData.filter(item => item.name.toLowerCase().includes(keyword));
       renderEcisList(filtered);
     }
 
-    // Chuyển đổi Bytes sang KB/MB
     function formatBytes(bytes) {
-      if (bytes === 0) return '0 Bytes';
+      if (!bytes || bytes === 0) return '0 Bytes';
       const k = 1024;
       const sizes = ['Bytes', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
