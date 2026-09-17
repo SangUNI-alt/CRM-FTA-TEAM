@@ -6,7 +6,9 @@ const { createClient } = require('@supabase/supabase-js');
 const TENANT_ID = "a70e2894-d043-4c2d-b843-b376e7e7df4b";
 const CLIENT_ID = "1f5c6852-079c-463a-8fc8-e814359698ee";
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const PARENT_FOLDER_ID = "https://uniconsulting079.sharepoint.com/:f:/s/SEDOVINA_CO/IgAJaovqxuNDQq6KUumP_IkHAXQkx84t9aAqB-3t5UwndeE?e=OEWhSl";
+
+const SITE_HOST = "uniconsulting079.sharepoint.com";
+const SITE_PATH = "/sites/SEDOVINA_CO";
 
 const SUPABASE_URL = "https://eggshqsdtieqzjtttdyh.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZ3NocXNkcmllcXpqdHR0ZHloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MjQ5MDMsImV4cCI6MjEwNTIwMDkwM30.7hgv-vm2GDL3xEa3IvFWfrtynCzWWlWDBDgLMrbuKw4";
@@ -14,11 +16,6 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false }
 });
-
-function getSharingUrlToken(url) {
-  const base64Value = Buffer.from(url).toString('base64');
-  return "u!" + base64Value.replace(/=/g, '').replace(/\//g, '_').replace(/\+/g, '-');
-}
 
 // 1. Lấy Access Token từ Microsoft Graph
 async function getAccessToken() {
@@ -41,60 +38,70 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-// 2. Hàm hỗ trợ lấy danh sách con của 1 folder từ Graph API
-async function getChildren(token, shareToken, driveId, itemId) {
-  let url = (driveId && itemId)
-    ? `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/children?$top=200`
-    : `https://graph.microsoft.com/v1.0/shares/${shareToken}/driveItem/children?$top=200`;
-
+// 2. Lấy danh sách items con trong 1 folder
+async function getChildren(token, driveId, itemId = 'root') {
+  let url = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/children?$top=200`;
   let items = [];
+
   while (url) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json();
-    if (data.error) throw new Error(`Lỗi lấy dữ liệu folder: ${data.error.message}`);
+    if (data.error) throw new Error(`Lỗi API (${itemId}): ${data.error.message}`);
     if (data.value) items.push(...data.value);
     url = data['@odata.nextLink'] || null;
   }
   return items;
 }
 
-// 3. Tiến hành quét phân cấp theo đúng Logic yêu cầu
+// 3. Tiến hành quét phân cấp
 async function runSync() {
-  console.log("🚀 Bắt đầu quá trình lọc và đồng bộ dữ liệu...");
+  console.log("🚀 Bắt đầu quá trình kết nối SharePoint và lọc dữ liệu...");
   
   try {
     const token = await getAccessToken();
-    const shareToken = getSharingUrlToken(PARENT_FOLDER_ID);
-    
-    // Đọc các mục tại gốc (thư mục 2026)
-    const rootItems = await getChildren(token, shareToken);
-    
-    // Tìm 2 folder con FCL và LCL
-    let level1Folders = rootItems.filter(item => item.folder && ["FCL", "LCL"].includes(item.name.toUpperCase()));
 
-    // Trường hợp link chia sẻ chứa folder 2026 ở bên trong
-    if (level1Folders.length === 0) {
-      const folder2026 = rootItems.find(item => item.folder && item.name === "2026");
-      if (folder2026) {
-        const items2026 = await getChildren(token, shareToken, folder2026.parentReference.driveId, folder2026.id);
-        level1Folders = items2026.filter(item => item.folder && ["FCL", "LCL"].includes(item.name.toUpperCase()));
-      }
+    // Lấy Site ID & Default Drive ID
+    const siteRes = await fetch(`https://graph.microsoft.com/v1.0/sites/${SITE_HOST}:${SITE_PATH}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const siteData = await siteRes.json();
+    if (siteData.error) throw new Error("Lỗi lấy Site ID: " + siteData.error.message);
+
+    const driveRes = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteData.id}/drive`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const driveData = await driveRes.json();
+    if (driveData.error) throw new Error("Lỗi lấy Drive ID: " + driveData.error.message);
+
+    const driveId = driveData.id;
+    console.log(`✅ Kết nối thành công Site SharePoint! Drive ID: ${driveId}`);
+
+    // Đọc gốc Document Library
+    let rootItems = await getChildren(token, driveId, 'root');
+
+    // Tìm thư mục "2026" nếu nằm ở cấp gốc
+    const folder2026 = rootItems.find(item => item.folder && item.name === "2026");
+    if (folder2026) {
+      console.log("📁 Đã tìm thấy thư mục '2026', tiến hành đi vào bên trong...");
+      rootItems = await getChildren(token, driveId, folder2026.id);
     }
 
+    // Lọc ra FCL và LCL
+    const level1Folders = rootItems.filter(item => item.folder && ["FCL", "LCL"].includes(item.name.toUpperCase()));
+
     if (level1Folders.length === 0) {
-      console.log("⚠️ Không tìm thấy folder FCL hoặc LCL nào.");
+      console.log("⚠️ Không tìm thấy folder FCL hoặc LCL nào trong danh sách.");
       return;
     }
 
     let recordsToUpsert = [];
 
-    // Duyệt qua từng folder FCL và LCL
+    // Duyệt FCL và LCL
     for (const l1Folder of level1Folders) {
       const categoryName = l1Folder.name.toUpperCase();
       console.log(`\n📂 Đang quét mục: ${categoryName}`);
 
-      const driveId = l1Folder.parentReference.driveId;
-      const l2Items = await getChildren(token, shareToken, driveId, l1Folder.id);
+      const l2Items = await getChildren(token, driveId, l1Folder.id);
       
       // LẤY ĐÚNG 5 FOLDER CON 2 ĐẦU TIÊN
       const l2Folders = l2Items.filter(item => item.folder).slice(0, 5);
@@ -103,20 +110,19 @@ async function runSync() {
       for (const l2Folder of l2Folders) {
         console.log(`  └─ Quét Folder Con 2: "${l2Folder.name}"`);
         
-        // Đọc các mục bên trong Folder Con 2
-        const l3Items = await getChildren(token, shareToken, driveId, l2Folder.id);
+        const l3Items = await getChildren(token, driveId, l2Folder.id);
 
-        // 1. Lọc tất cả file PDF có trong Folder Con 2
+        // Lọc file PDF ở Folder Con 2
         const pdfFiles = l3Items
           .filter(item => !item.folder && item.name.toLowerCase().endsWith('.pdf'))
           .map(item => item.name);
 
-        // 2. Lấy các Folder Con 3 để quét file XLS/XLSX
+        // Quét các Folder Con 3 để tìm file XLS/XLSX
         const l3Folders = l3Items.filter(item => item.folder);
         let xlsFiles = [];
 
         for (const l3Folder of l3Folders) {
-          const l4Items = await getChildren(token, shareToken, driveId, l3Folder.id);
+          const l4Items = await getChildren(token, driveId, l3Folder.id);
           const xlInL3 = l4Items
             .filter(item => !item.folder && (item.name.toLowerCase().endsWith('.xls') || item.name.toLowerCase().endsWith('.xlsx')))
             .map(item => item.name);
@@ -124,7 +130,6 @@ async function runSync() {
           xlsFiles.push(...xlInL3);
         }
 
-        // Đóng gói bản ghi
         recordsToUpsert.push({
           id: l2Folder.id,
           category: categoryName,
@@ -140,7 +145,6 @@ async function runSync() {
 
     console.log(`\n Nạp ${recordsToUpsert.length} bản ghi vào bảng 'ecis_summary' trên Supabase...`);
 
-    // Ghi dữ liệu vào bảng ecis_summary
     const { error } = await supabase.from('ecis_summary').upsert(recordsToUpsert);
 
     if (error) {
