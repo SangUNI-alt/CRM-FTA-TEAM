@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>CRM ECIS Explorer - M365</title>
+  <!-- SDK của MS Teams và MSAL Authentication -->
+  <script src="https://res.cdn.office.net/teams-js/v2.19.0/js/MicrosoftTeams.min.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
+  <!-- TailwindCSS giao diện -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4 h-screen flex flex-col font-sans">
+
+  <!-- HEADER -->
+  <div class="bg-white p-4 rounded-xl shadow-md mb-4 flex justify-between items-center border">
+    <div>
+      <h1 class="text-xl font-bold text-indigo-700">CRM ECIS Explorer (M365 Cloud)</h1>
+      <p class="text-xs text-gray-500">Kết nối trực tiếp SharePoint / OneDrive Doanh nghiệp</p>
+    </div>
+    <div id="userInfo" class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border font-semibold">
+      Đang xác thực tài khoản M365...
+    </div>
+  </div>
+
+  <!-- BẢNG 2 CỘT -->
+  <div class="flex-1 flex gap-4 overflow-hidden">
+    <!-- CỘT TRÁI: DANH SÁCH %ECIS% -->
+    <div class="w-1/2 bg-white rounded-xl shadow-md p-4 flex flex-col border">
+      <div class="pb-3 border-b mb-3 flex justify-between items-center">
+        <h2 class="font-bold text-gray-700">📂 Danh Sách Thư Mục Con (%ECIS%)</h2>
+        <input type="text" id="searchEcis" onkeyup="filterEcis()" placeholder="Tìm %ECIS%..." class="p-1 border rounded text-xs w-36">
+      </div>
+      <div class="flex-1 overflow-y-auto" id="ecisListContainer">
+        <div class="text-center py-10 text-gray-400 text-sm">Đang tải dữ liệu từ Cloud...</div>
+      </div>
+    </div>
+
+    <!-- CỘT PHẢI: DANH SÁCH FILE -->
+    <div class="w-1/2 bg-white rounded-xl shadow-md p-4 flex flex-col border">
+      <div class="pb-3 border-b mb-3">
+        <h2 id="selectedEcisTitle" class="font-bold text-indigo-600">Chưa chọn %ECIS% nào</h2>
+        <p class="text-xs text-gray-400">Chọn 1 thư mục bên trái để xem file</p>
+      </div>
+      <div class="flex-1 overflow-y-auto" id="fileListContainer">
+        <div class="text-center py-10 text-gray-400 text-sm">Chưa có dữ liệu file</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // CẤU HÌNH THÔNG TIN AZURE APP CỦA BẠN TẠI ĐÂY
+    const CLIENT_ID = "DÁN_APPLICATION_CLIENT_ID_VÀO_ĐÂY";
+    const TENANT_ID = "DÁN_DIRECTORY_TENANT_ID_VÀO_ĐÂY";
+    const PARENT_FOLDER_ID = "DÁN_ID_CỦA_FOLDER_MẸ_TRÊN_ONEDRIVE_HOẶC_SHAREPOINT";
+
+    let accessToken = "";
+    let ecisData = [];
+
+    // Khởi tạo MS Teams SDK
+    microsoftTeams.app.initialize().then(() => {
+      // Đăng nhập lấy Token gọi Graph API
+      getToken();
+    });
+
+    async function getToken() {
+      const msalConfig = {
+        auth: { clientId: CLIENT_ID, authority: `https://login.microsoftonline.com/${TENANT_ID}` }
+      };
+      const msalInstance = new msal.PublicClientApplication(msalConfig);
+      
+      try {
+        const response = await msalInstance.loginPopup({ scopes: ["Files.Read.All", "User.Read"] });
+        accessToken = response.accessToken;
+        document.getElementById('userInfo').innerText = `👤 ${response.account.username}`;
+        
+        // Gọi Graph API lấy thư mục con
+        loadEcisFolders();
+      } catch (err) {
+        console.error("Lỗi xác thực:", err);
+      }
+    }
+
+    // Gọi Microsoft Graph API lấy toàn bộ Folder Con cấp 1 (%ECIS%)
+    async function loadEcisFolders() {
+      const url = `https://graph.microsoft.com/v1.0/me/drive/items/${PARENT_FOLDER_ID}/children?$filter=folder ne null`;
+      
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const data = await res.json();
+      ecisData = data.value || [];
+
+      renderEcisList(ecisData);
+    }
+
+    function renderEcisList(folders) {
+      const container = document.getElementById('ecisListContainer');
+      container.innerHTML = '';
+
+      folders.forEach(folder => {
+        container.innerHTML += `
+          <div onclick="loadFilesForEcis('${folder.id}', '${folder.name}')" class="p-3 hover:bg-indigo-50 border-b cursor-pointer flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <span class="text-xs bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded">%ECIS%</span>
+              <span class="font-medium text-gray-800 text-sm">${folder.name}</span>
+            </div>
+            <span class="text-xs text-gray-400">📂 Thư mục</span>
+          </div>
+        `;
+      });
+    }
+
+    // Khi chọn 1 %ECIS% -> Gọi tiếp Graph API lấy các file bên trong
+    async function loadFilesForEcis(folderId, folderName) {
+      document.getElementById('selectedEcisTitle').innerText = `📂 %ECIS%: ${folderName}`;
+      const container = document.getElementById('fileListContainer');
+      container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Đang đọc file...</div>';
+
+      const url = `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children?$filter=folder eq null`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const data = await res.json();
+      const files = data.value || [];
+
+      container.innerHTML = '';
+      if (files.length === 0) {
+        container.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">Không có file nào</div>';
+        return;
+      }
+
+      files.forEach(file => {
+        container.innerHTML += `
+          <div class="p-3 bg-gray-50 rounded mb-2 border flex justify-between items-center">
+            <div>
+              <div class="font-semibold text-gray-800 text-sm">📄 ${file.name}</div>
+              <div class="text-xs text-gray-400">${Math.round(file.size / 1024)} KB</div>
+            </div>
+            <a href="${file.webUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Mở File</a>
+          </div>
+        `;
+      });
+    }
+  </script>
+</body>
+</html>
