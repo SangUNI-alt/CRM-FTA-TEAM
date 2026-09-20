@@ -3,11 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ECIS Dashboard - CRM Management</title>
+  <title>CO TRACKING SEDO 2026</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    /* Hiệu ứng nhấp nháy chuyển động nhẹ nhàng cho BILL Xanh */
+    @keyframes billPulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+        box-shadow: 0 0 0px rgba(34, 197, 94, 0);
+      }
+      50% {
+        opacity: 0.85;
+        transform: scale(1.05);
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+      }
+    }
+    .bill-active-anim {
+      animation: billPulse 1.8s infinite ease-in-out;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans antialiased">
 
@@ -16,7 +35,8 @@
     <!-- HEADER -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
       <div>
-        <h1 class="text-3xl font-bold text-slate-800">Quản Lý Thư Mục ECIS 2026</h1>
+        <!-- 1. ĐỔI TÊN TIÊU ĐỀ -->
+        <h1 class="text-3xl font-bold text-slate-800">CO TRACKING SEDO 2026</h1>
         <p class="text-sm text-gray-500 mt-1">Theo dõi các loại chứng từ PDF thiếu và Mã tờ khai Excel thời gian thực</p>
       </div>
       <div class="flex items-center gap-2">
@@ -52,12 +72,20 @@
                class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
       </div>
       
-      <div class="flex gap-2 w-full md:w-auto">
+      <div class="flex gap-2 w-full md:w-auto flex-wrap md:flex-nowrap">
         <select id="category-filter" onchange="filterData()" class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="ALL">Tất cả loại (FCL/LCL)</option>
           <option value="FCL">Chỉ FCL</option>
           <option value="LCL">Chỉ LCL</option>
         </select>
+        
+        <!-- BỘ LỌC BILL MỚI -->
+        <select id="bill-filter" onchange="filterData()" class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="ALL">Tất cả BILL</option>
+          <option value="HAS_BILL">Đã Có BILL</option>
+          <option value="NO_BILL">Chưa Có BILL</option>
+        </select>
+
         <select id="status-filter" onchange="filterData()" class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="ALL">Tất cả hồ sơ</option>
           <option value="FULL">Hồ sơ Full</option>
@@ -75,9 +103,9 @@
             <th class="py-3 px-4 text-center">Date PL</th>
             <th class="py-3 px-4">Country</th>
             <th class="py-3 px-4">ECIS</th>
+            <th class="py-3 px-4">Tờ Khai</th> <!-- ĐẨY VỊ TRÍ TỜ KHAI LÊN SAU ECIS -->
             <th class="py-3 px-4">FILE THIẾU</th>
-            <th class="py-3 px-4">Tờ Khai</th>
-            <th class="py-3 px-4 text-right">Cập Nhật Lần Cuối</th>
+            <th class="py-3 px-4 text-center">BILL</th> <!-- THAY CẬP NHẬT LẦN CUỐI THÀNH BILL -->
             <th class="py-3 px-4 text-center">Thao Tác</th>
           </tr>
         </thead>
@@ -116,6 +144,14 @@
 
     let globalData = [];
 
+    // HÀM KIỂM TRA FILE BILL (FCL: _B, LCL: _FCR)
+    function checkHasBill(pdfList, category) {
+      if (!pdfList || !Array.isArray(pdfList)) return false;
+      const isLCL = (category && category.toUpperCase() === 'LCL');
+      const billKey = isLCL ? '_FCR' : '_B';
+      return pdfList.some(f => f.toUpperCase().includes(billKey));
+    }
+
     // LOGIC 1: Kiểm tra danh sách file PDF thiếu (Phân biệt FCL và LCL)
     function getMissingPdfTypes(pdfList, category) {
       if (!pdfList || !Array.isArray(pdfList)) pdfList = [];
@@ -127,7 +163,7 @@
       if (!pdfList.some(f => f.toUpperCase().includes('_TKN+VAT.PDF'))) missing.push('TKN+VAT');
 
       const isLCL = (category && category.toUpperCase() === 'LCL');
-      const billKey = isLCL ? '_FCR.PDF' : '_B.PDF';
+      const billKey = isLCL ? '_FCR' : '_B';
       if (!pdfList.some(f => f.toUpperCase().includes(billKey))) missing.push('B');
 
       if (!pdfList.some(f => f.toUpperCase().includes('_QTSX.PDF'))) missing.push('QTSX');
@@ -189,6 +225,7 @@
     function filterData() {
       const rawSearch = document.getElementById('search-input').value;
       const cat = document.getElementById('category-filter').value;
+      const billStatus = document.getElementById('bill-filter').value;
       const status = document.getElementById('status-filter').value;
 
       const searchTerms = rawSearch
@@ -206,11 +243,17 @@
 
         const matchCat = cat === 'ALL' || item.category === cat;
         
+        // LỌC THEO TÌNH TRẠNG BILL
+        const hasBill = checkHasBill(item.pdf_list, item.category);
+        let matchBill = true;
+        if (billStatus === 'HAS_BILL') matchBill = hasBill;
+        if (billStatus === 'NO_BILL') matchBill = !hasBill;
+
         const missing = getMissingPdfTypes(item.pdf_list, item.category);
         const isFull = missing.length === 0;
         const matchStatus = status === 'ALL' || (status === 'FULL' ? isFull : !isFull);
 
-        return matchSearch && matchCat && matchStatus;
+        return matchSearch && matchCat && matchBill && matchStatus;
       });
 
       renderTable(filtered);
@@ -238,9 +281,14 @@
         }
 
         const declarationDisplay = extractDeclarationNumbers(item.xls_list);
-        const timeStr = new Date(item.updated_at).toLocaleString('vi-VN');
 
-        // Giá trị mới từ PL
+        // HIỂN THỊ BILL CHUYỂN ĐỘNG / MÀU SẮC
+        const hasBill = checkHasBill(item.pdf_list, item.category);
+        const billDisplay = hasBill 
+          ? `<span class="inline-block bg-green-500 text-white font-black text-xs px-2.5 py-1 rounded shadow-sm bill-active-anim">BILL</span>`
+          : `<span class="inline-block bg-red-100 text-red-600 border border-red-300 font-bold text-xs px-2.5 py-1 rounded">BILL</span>`;
+
+        // Giá trị PL
         const plDateDisplay = item.pl_date || '---';
         const countryDisplay = item.country || '---';
 
@@ -251,9 +299,9 @@
           <td class="py-3 px-4 text-center font-semibold text-slate-700 bg-slate-50/50">${plDateDisplay}</td>
           <td class="py-3 px-4 font-semibold text-indigo-700 uppercase">${countryDisplay}</td>
           <td class="py-3 px-4 font-medium text-gray-800">${item.folder_name}</td>
+          <td class="py-3 px-4 font-mono text-emerald-700 font-medium">${declarationDisplay}</td> <!-- ĐẨY CỘT TỜ KHAI LÊN ĐÂY -->
           <td class="py-3 px-4">${missingDisplay}</td>
-          <td class="py-3 px-4 font-mono text-emerald-700 font-medium">${declarationDisplay}</td>
-          <td class="py-3 px-4 text-right text-xs text-gray-500">${timeStr}</td>
+          <td class="py-3 px-4 text-center">${billDisplay}</td> <!-- CỘT BILL MỚI -->
           <td class="py-3 px-4 text-center">
             <button onclick="openModal('${item.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded">
               🔍 Xem File
