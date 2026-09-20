@@ -35,7 +35,6 @@
     <!-- HEADER -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
       <div>
-        <!-- 1. ĐỔI TÊN TIÊU ĐỀ -->
         <h1 class="text-3xl font-bold text-slate-800">CO TRACKING SEDO 2026</h1>
         <p class="text-sm text-gray-500 mt-1">Theo dõi các loại chứng từ PDF thiếu và Mã tờ khai Excel thời gian thực</p>
       </div>
@@ -43,7 +42,7 @@
         <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
           <span class="w-2 h-2 mr-2 bg-green-500 rounded-full animate-ping"></span> Realtime Active
         </span>
-        <button onclick="fetchData()" class="bg-slate-800 hover:bg-slate-700 text-white text-sm px-4 py-2 rounded-lg transition">
+        <button onclick="triggerSyncAndReload()" class="bg-slate-800 hover:bg-slate-700 text-white text-sm px-4 py-2 rounded-lg transition">
           🔄 Tải lại
         </button>
       </div>
@@ -79,7 +78,6 @@
           <option value="LCL">Chỉ LCL</option>
         </select>
         
-        <!-- BỘ LỌC BILL MỚI -->
         <select id="bill-filter" onchange="filterData()" class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="ALL">Tất cả BILL</option>
           <option value="HAS_BILL">Đã Có BILL</option>
@@ -99,20 +97,29 @@
       <table class="w-full text-left border-collapse text-sm">
         <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold border-b">
           <tr>
-            <th class="py-3 px-4">Loại</th>
+            <th class="py-3 px-4 text-center w-12">No.</th>
+            <th class="py-3 px-4">TYPE</th> <!-- 1. ĐỔI THÀNH TYPE -->
             <th class="py-3 px-4 text-center">Date PL</th>
             <th class="py-3 px-4">Country</th>
             <th class="py-3 px-4">ECIS</th>
-            <th class="py-3 px-4">Tờ Khai</th> <!-- ĐẨY VỊ TRÍ TỜ KHAI LÊN SAU ECIS -->
+            <th class="py-3 px-4">Tờ Khai</th>
             <th class="py-3 px-4">FILE THIẾU</th>
-            <th class="py-3 px-4 text-center">BILL</th> <!-- THAY CẬP NHẬT LẦN CUỐI THÀNH BILL -->
-            <th class="py-3 px-4 text-center">Thao Tác</th>
+            <th class="py-3 px-4 text-center">BILL</th>
+            <th class="py-3 px-4 text-center w-12"></th> <!-- 3. BỎ CHỮ THAO TÁC -->
           </tr>
         </thead>
         <tbody id="table-body" class="divide-y divide-gray-100">
           <!-- Dữ liệu render bằng JS -->
         </tbody>
       </table>
+
+      <!-- THANH PHÂN TRANG -->
+      <div class="p-4 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
+        <span id="page-info" class="text-xs text-gray-500 font-medium">Hiển thị 0 - 0 trong tổng số 0 ECIS</span>
+        <div id="pagination-controls" class="flex items-center gap-1.5">
+          <!-- Nút bấm phân trang tự sinh bằng JS -->
+        </div>
+      </div>
     </div>
 
   </div>
@@ -143,8 +150,31 @@
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let globalData = [];
+    let filteredData = [];
+    let currentPage = 1;
+    const itemsPerPage = 20;
 
-    // HÀM KIỂM TRA FILE BILL (FCL: _B, LCL: _FCR)
+    // HÀM GỌI SERVER LOCAL
+    async function triggerSyncAndReload() {
+      const syncBtn = document.querySelector('button[onclick="triggerSyncAndReload()"]');
+      if (syncBtn) syncBtn.innerText = "⏳ Đang quét 40 ECIS...";
+
+      try {
+        const res = await fetch('http://localhost:3000/run-sync');
+        const result = await res.json();
+        
+        if (!result.success) {
+          alert("⚠️ Lỗi đồng bộ: " + result.message);
+        }
+      } catch (err) {
+        console.warn("Chưa bật server local (server.js). Sẽ chỉ tải lại dữ liệu từ Supabase.");
+      }
+
+      await fetchData();
+      if (syncBtn) syncBtn.innerText = "🔄 Tải lại";
+    }
+
+    // HÀM KIỂM TRA FILE BILL
     function checkHasBill(pdfList, category) {
       if (!pdfList || !Array.isArray(pdfList)) return false;
       const isLCL = (category && category.toUpperCase() === 'LCL');
@@ -152,19 +182,16 @@
       return pdfList.some(f => f.toUpperCase().includes(billKey));
     }
 
-    // LOGIC 1: Kiểm tra danh sách file PDF thiếu (Phân biệt FCL và LCL)
+    // LOGIC 1: Kiểm tra danh sách file PDF thiếu (2. BỎ FILE BILL 'B' RA KHỎI CỘT THIẾU)
     function getMissingPdfTypes(pdfList, category) {
       if (!pdfList || !Array.isArray(pdfList)) pdfList = [];
-
       let missing = [];
 
       if (!pdfList.some(f => f.toUpperCase().includes('_BK.PDF'))) missing.push('BK');
       if (!pdfList.some(f => f.toUpperCase().includes('_PLX.PDF'))) missing.push('PLX');
       if (!pdfList.some(f => f.toUpperCase().includes('_TKN+VAT.PDF'))) missing.push('TKN+VAT');
 
-      const isLCL = (category && category.toUpperCase() === 'LCL');
-      const billKey = isLCL ? '_FCR' : '_B';
-      if (!pdfList.some(f => f.toUpperCase().includes(billKey))) missing.push('B');
+      // Đã lược bỏ kiểm tra thiếu BILL ở đây vì có cột BILL riêng
 
       if (!pdfList.some(f => f.toUpperCase().includes('_QTSX.PDF'))) missing.push('QTSX');
       if (!pdfList.some(f => f.toUpperCase().includes('_PL.PDF'))) missing.push('PL');
@@ -233,7 +260,7 @@
         .map(term => term.trim().toLowerCase())
         .filter(term => term.length > 0);
 
-      const filtered = globalData.filter(item => {
+      filteredData = globalData.filter(item => {
         const folderNameLower = item.folder_name.toLowerCase();
 
         let matchSearch = true;
@@ -243,7 +270,6 @@
 
         const matchCat = cat === 'ALL' || item.category === cat;
         
-        // LỌC THEO TÌNH TRẠNG BILL
         const hasBill = checkHasBill(item.pdf_list, item.category);
         let matchBill = true;
         if (billStatus === 'HAS_BILL') matchBill = hasBill;
@@ -256,19 +282,26 @@
         return matchSearch && matchCat && matchBill && matchStatus;
       });
 
-      renderTable(filtered);
+      currentPage = 1;
+      renderTable();
     }
 
-    function renderTable(data) {
+    function renderTable() {
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = '';
 
-      if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào.</td></tr>`;
+      if (filteredData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào.</td></tr>`;
+        renderPagination(0);
         return;
       }
 
-      data.forEach((item) => {
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = Math.min(startIndex + itemsPerPage, filteredData.length);
+      const pageData = filteredData.slice(startIndex, endIndex);
+
+      pageData.forEach((item, index) => {
+        const stt = startIndex + index + 1;
         const missingList = getMissingPdfTypes(item.pdf_list, item.category);
         
         let missingDisplay = '';
@@ -282,34 +315,74 @@
 
         const declarationDisplay = extractDeclarationNumbers(item.xls_list);
 
-        // HIỂN THỊ BILL CHUYỂN ĐỘNG / MÀU SẮC
         const hasBill = checkHasBill(item.pdf_list, item.category);
         const billDisplay = hasBill 
           ? `<span class="inline-block bg-green-500 text-white font-black text-xs px-2.5 py-1 rounded shadow-sm bill-active-anim">BILL</span>`
           : `<span class="inline-block bg-red-100 text-red-600 border border-red-300 font-bold text-xs px-2.5 py-1 rounded">BILL</span>`;
 
-        // Giá trị PL
         const plDateDisplay = item.pl_date || '---';
         const countryDisplay = item.country || '---';
 
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50 transition border-b";
         tr.innerHTML = `
+          <td class="py-3 px-4 text-center font-bold text-slate-400 text-xs">${stt}</td>
           <td class="py-3 px-4 font-bold ${item.category === 'FCL' ? 'text-blue-600' : 'text-purple-600'}">${item.category}</td>
           <td class="py-3 px-4 text-center font-semibold text-slate-700 bg-slate-50/50">${plDateDisplay}</td>
           <td class="py-3 px-4 font-semibold text-indigo-700 uppercase">${countryDisplay}</td>
           <td class="py-3 px-4 font-medium text-gray-800">${item.folder_name}</td>
-          <td class="py-3 px-4 font-mono text-emerald-700 font-medium">${declarationDisplay}</td> <!-- ĐẨY CỘT TỜ KHAI LÊN ĐÂY -->
+          <td class="py-3 px-4 font-mono text-emerald-700 font-medium">${declarationDisplay}</td>
           <td class="py-3 px-4">${missingDisplay}</td>
-          <td class="py-3 px-4 text-center">${billDisplay}</td> <!-- CỘT BILL MỚI -->
+          <td class="py-3 px-4 text-center">${billDisplay}</td>
           <td class="py-3 px-4 text-center">
-            <button onclick="openModal('${item.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded">
-              🔍 Xem File
+            <!-- 3. CHỈ HIỂN THỊ NÚT KÍNH LÚP, BỎ CHỮ 'Xem File' -->
+            <button onclick="openModal('${item.id}')" title="Xem chi tiết file" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded transition">
+              🔍
             </button>
           </td>
         `;
         tbody.appendChild(tr);
       });
+
+      renderPagination(startIndex, endIndex);
+    }
+
+    function renderPagination(startIndex, endIndex) {
+      const totalItems = filteredData.length;
+      const totalPages = Math.ceil(totalItems / itemsPerPage);
+      const pageInfo = document.getElementById('page-info');
+      const controls = document.getElementById('pagination-controls');
+
+      if (totalItems === 0) {
+        pageInfo.innerText = 'Hiển thị 0 ECIS';
+        controls.innerHTML = '';
+        return;
+      }
+
+      pageInfo.innerText = `Hiển thị ${startIndex + 1} - ${endIndex} trong tổng số ${totalItems} ECIS`;
+
+      let buttonsHTML = '';
+
+      buttonsHTML += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} 
+        class="px-2.5 py-1 text-xs rounded border bg-white ${currentPage === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100'}">Trang trước</button>`;
+
+      for (let i = 1; i <= totalPages; i++) {
+        const isActive = i === currentPage;
+        buttonsHTML += `<button onclick="changePage(${i})" 
+          class="px-3 py-1 text-xs rounded border font-semibold ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white hover:bg-slate-100 text-slate-700'}">${i}</button>`;
+      }
+
+      buttonsHTML += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} 
+        class="px-2.5 py-1 text-xs rounded border bg-white ${currentPage === totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100'}">Trang sau</button>`;
+
+      controls.innerHTML = buttonsHTML;
+    }
+
+    function changePage(page) {
+      const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      renderTable();
     }
 
     function openModal(id) {
@@ -326,7 +399,7 @@
         : `<li class="text-gray-400 italic">Không có file PDF</li>`;
 
       const xlsList = document.getElementById('modal-xls-list');
-      xlsList.innerHTML = (item.xls_list && item.xls_list.length > 0)
+      xlsList.innerHTML = (item.xls_list && item.xls_list.length > 0) 
         ? item.xls_list.map(f => `<li>${f}</li>`).join('')
         : `<li class="text-gray-400 italic">Không có file Excel</li>`;
 
