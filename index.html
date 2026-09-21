@@ -4,13 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CO TRACKING SEDO 2026</title>
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
-    /* Hiệu ứng nhấp nháy chuyển động nhẹ nhàng cho BILL Xanh */
     @keyframes billPulse {
       0%, 100% {
         opacity: 1;
@@ -67,7 +64,6 @@
     <!-- BỘ LỌC VÀ TÌM KIẾM NÂNG CAO -->
     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col gap-4">
       
-      <!-- HÀNG 1: Ô Tìm kiếm + Bộ lọc cơ bản -->
       <div class="flex flex-col md:flex-row gap-3 justify-between items-start">
         <div class="w-full md:w-1/2">
           <textarea id="search-input" oninput="filterData()" rows="2" placeholder="🔍 Tìm kiếm ECIS (Hỗ trợ nhập/dán nhiều mã phân cách bằng xuống dòng hoặc dấu phẩy)..." 
@@ -81,7 +77,6 @@
             <option value="LCL">Chỉ LCL</option>
           </select>
 
-          <!-- BỘ LỌC CỘT FORM -->
           <select id="form-filter" onchange="filterData()" class="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-amber-50/50 font-medium">
             <option value="ALL">Tất cả FORM</option>
             <option value="EUR1">Form EUR1</option>
@@ -102,7 +97,6 @@
         </div>
       </div>
 
-      <!-- HÀNG 2: BỘ LỌC CHI TIẾT THIẾU/CÓ CHỨNG TỪ (SUB-FILTERS) -->
       <div class="pt-3 border-t flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-lg">
         <span class="text-xs font-bold text-slate-600 uppercase">Bộ lọc File Thiếu:</span>
         
@@ -112,7 +106,6 @@
           <option value="MISSING">Hồ sơ còn thiếu chứng từ</option>
         </select>
 
-        <!-- SUB-FILTER DÀNH RIÊNG TỪNG LOẠI FILE/TỜ KHAI (ĐÃ BỎ CHỮ "FILE") -->
         <div class="flex items-center gap-2 border-l pl-3">
           <span class="text-xs text-slate-500">Lọc chi tiết file:</span>
           <select id="doc-type-filter" onchange="filterData()" class="px-2.5 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
@@ -127,7 +120,6 @@
             <option value="TOKHAI">Tờ khai</option>
           </select>
 
-          <!-- BỘ LỌC TRẠNG THÁI (ĐÃ BỎ CHỮ "FILE NÀY") -->
           <select id="doc-status-filter" onchange="filterData()" class="px-2.5 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
             <option value="HAS_NOT">⚠️ Chưa có</option>
             <option value="HAS">✅ Đã có</option>
@@ -150,6 +142,8 @@
             <th class="py-3 px-4">ECIS</th>
             <th class="py-3 px-4">Tờ Khai</th>
             <th class="py-3 px-4">FILE THIẾU</th>
+            <!-- CỘT ETD NẰM TRƯỚC CỘT BILL -->
+            <th class="py-3 px-4 text-center">ETD</th>
             <th class="py-3 px-4 text-center">BILL</th>
             <th class="py-3 px-4 text-center w-12"></th>
           </tr>
@@ -162,9 +156,7 @@
       <!-- THANH PHÂN TRANG -->
       <div class="p-4 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
         <span id="page-info" class="text-xs text-gray-500 font-medium">Hiển thị 0 - 0 trong tổng số 0 ECIS</span>
-        <div id="pagination-controls" class="flex items-center gap-1.5">
-          <!-- Nút bấm phân trang tự sinh bằng JS -->
-        </div>
+        <div id="pagination-controls" class="flex items-center gap-1.5"></div>
       </div>
     </div>
 
@@ -195,7 +187,6 @@
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZ3NocXNkcmllcXpqdHR0ZHloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MjQ5MDMsImV4cCI6MjEwNTIwMDkwM30.7hgv-vm2GDL3xEa3IvFWfrtynCzWWlWDBDgLMrbuKw4";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // DANH SÁCH TRA CỨU FORM CÁC NƯỚC TỪ FILE EXCEL
     const COUNTRY_FORM_MAP = {
       'GB': 'EUR1', 'UNITED KINGDOM': 'EUR1', 'UK': 'EUR1',
       'NL': 'EUR1', 'NETHERLANDS': 'EUR1',
@@ -257,7 +248,6 @@
       return pdfList.some(f => f.toUpperCase().includes(billKey));
     }
 
-    // LOGIC LẤY FILE THIẾU (GỒM CẢ DRAFT DÀNH CHO EUR1 & AI)
     function getMissingPdfTypes(pdfList, category, countryStr, xlsList) {
       if (!pdfList || !Array.isArray(pdfList)) pdfList = [];
       if (!xlsList || !Array.isArray(xlsList)) xlsList = [];
@@ -356,40 +346,31 @@
         const folderNameLower = item.folder_name.toLowerCase();
         const itemForm = getFormByCountry(item.country);
 
-        // 1. Tìm kiếm chuỗi văn bản
         let matchSearch = true;
         if (searchTerms.length > 0) {
           matchSearch = searchTerms.some(term => folderNameLower.includes(term));
         }
 
-        // 2. Lọc Type (FCL/LCL)
         const matchCat = cat === 'ALL' || item.category === cat;
-        
-        // 3. Lọc theo FORM
         const matchForm = selectedForm === 'ALL' || itemForm === selectedForm;
 
-        // 4. Lọc theo BILL
         const hasBill = checkHasBill(item.pdf_list, item.category);
         let matchBill = true;
         if (billStatus === 'HAS_BILL') matchBill = hasBill;
         if (billStatus === 'NO_BILL') matchBill = !hasBill;
 
-        // 5. Lọc trạng thái Full/Missing
         const missing = getMissingPdfTypes(item.pdf_list, item.category, item.country, item.xls_list);
         const isFull = missing.length === 0;
         const matchStatus = status === 'ALL' || (status === 'FULL' ? isFull : !isFull);
 
-        // 6. Lọc chi tiết từng loại chứng từ (Bao gồm cả Tờ khai)
         let matchDocFilter = true;
         if (docType !== 'ALL') {
           if (docType === 'TOKHAI') {
-            // Xử lý riêng cho Tờ Khai
             const decNum = extractDeclarationNumbers(item.xls_list);
             const hasToKhai = (decNum !== '---');
             if (docStatus === 'HAS_NOT') matchDocFilter = !hasToKhai;
             else if (docStatus === 'HAS') matchDocFilter = hasToKhai;
           } else {
-            // Xử lý cho các loại file còn lại (BK, DRAFT, PLX, TKN+VAT, QTSX, PL, INV)
             const isMissingThisDoc = missing.includes(docType);
             if (docStatus === 'HAS_NOT') {
               matchDocFilter = isMissingThisDoc;
@@ -411,7 +392,7 @@
       tbody.innerHTML = '';
 
       if (filteredData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
         renderPagination(0);
         return;
       }
@@ -443,6 +424,12 @@
           : `<span class="inline-block bg-red-100 text-red-600 border border-red-300 font-bold text-xs px-2.5 py-1 rounded">BILL</span>`;
 
         const plDateDisplay = item.pl_date || '---';
+        
+        // ĐỊNH DẠNG HIỂN THỊ CỘT ETD
+        const etdDisplay = item.etd && item.etd !== '---'
+          ? `<span class="inline-block bg-blue-50 text-blue-700 font-bold text-xs px-2 py-0.5 rounded border border-blue-200">${item.etd}</span>`
+          : `<span class="text-gray-400 text-xs">---</span>`;
+
         const countryDisplay = item.country || '---';
 
         const formValue = getFormByCountry(countryDisplay);
@@ -463,7 +450,11 @@
           <td class="py-3 px-4 font-medium text-gray-800">${item.folder_name}</td>
           <td class="py-3 px-4 font-mono text-emerald-700 font-medium">${declarationDisplay}</td>
           <td class="py-3 px-4">${missingDisplay}</td>
+          
+          <!-- CỘT ETD TRƯỚC CỘT BILL -->
+          <td class="py-3 px-4 text-center">${etdDisplay}</td>
           <td class="py-3 px-4 text-center">${billDisplay}</td>
+          
           <td class="py-3 px-4 text-center">
             <button onclick="openModal('${item.id}')" title="Xem chi tiết file" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded transition">
               🔍
@@ -541,7 +532,6 @@
       document.getElementById('file-modal').classList.remove('flex');
     }
 
-    // KÍCH HOẠT REALTIME
     supabaseClient
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ecis_summary' }, () => {
@@ -549,7 +539,6 @@
       })
       .subscribe();
 
-    // Tải dữ liệu ban đầu
     fetchData();
   </script>
 </body>
