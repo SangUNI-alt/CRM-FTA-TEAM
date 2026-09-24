@@ -143,7 +143,6 @@
             <th class="py-3 px-4">Tờ Khai</th>
             <th class="py-3 px-4">FILE THIẾU</th>
             <th class="py-3 px-4 text-center">ETD</th>
-            <!-- CỘT DEADLINE BỔ SUNG NGAY SAU ETD -->
             <th class="py-3 px-4 text-center">DEADLINE</th>
             <th class="py-3 px-4 text-center">BILL</th>
             <th class="py-3 px-4 text-center w-12"></th>
@@ -184,13 +183,13 @@
   </div>
 
   <script>
-    const SUPABASE_URL = "https://eggshqsdrieqzjtttdyh.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZ3NocXNkcmllcXpqdHR0ZHloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2MjQ5MDMsImV4cCI6MjEwNTIwMDkwM30.7hgv-vm2GDL3xEa3IvFWfrtynCzWWlWDBDgLMrbuKw4";
+    const SUPABASE_URL = "http://localhost:8000";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const COUNTRY_FORM_MAP = {
       'GB': 'EUR1', 'UNITED KINGDOM': 'EUR1', 'UK': 'EUR1',
-      'NL': 'EUR1', 'NETHERLANDS': 'EUR1',
+      'NL': 'NETHERLANDS', 'NETHERLANDS': 'EUR1',
       'MY': 'D',    'MALAYSIA': 'D',
       'FR': 'EUR1', 'FRANCE': 'EUR1',
       'SE': 'EUR1', 'SWEDEN': 'EUR1',
@@ -218,31 +217,25 @@
       return COUNTRY_FORM_MAP[cleanCountry] || '---';
     }
 
-    // HÀM MỚI BỔ SUNG: XỬ LÝ BADGE TÔ MÀU CỘT DEADLINE
     function getDeadlineBadge(deadlineStr) {
       if (!deadlineStr || deadlineStr === '---') {
         return `<span class="text-gray-400 text-xs">---</span>`;
       }
 
-      // 1. Quá hạn (OVER ... DAYS) -> Tô Màu Đỏ
       if (deadlineStr.startsWith('OVER')) {
         return `<span class="inline-block bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">${deadlineStr}</span>`;
       }
 
-      // 2. Chưa quá hạn (... DAYS) -> Tô màu dựa trên số ngày còn lại
       const match = deadlineStr.match(/^(\d+)\s*DAYS$/);
       if (match) {
         const days = parseInt(match[1], 10);
         if (days === 0 || days === 1) {
-          // 0 DAYS và 1 DAYS -> Tô Màu Đỏ
           return `<span class="inline-block bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">${deadlineStr}</span>`;
         } else if (days === 2 || days === 3) {
-          // 2 DAYS và 3 DAYS -> Tô Màu Vàng
           return `<span class="inline-block bg-amber-400 text-slate-900 font-bold text-xs px-2 py-0.5 rounded shadow-sm">${deadlineStr}</span>`;
         }
       }
 
-      // > 3 DAYS -> Giữ màu bình thường
       return `<span class="inline-block bg-slate-100 text-slate-700 font-semibold text-xs px-2 py-0.5 rounded border border-slate-200">${deadlineStr}</span>`;
     }
 
@@ -454,14 +447,11 @@
 
         const plDateDisplay = item.pl_date || '---';
         
-        // ĐỊNH DẠNG HIỂN THỊ CỘT ETD
         const etdDisplay = item.etd && item.etd !== '---'
           ? `<span class="inline-block bg-blue-50 text-blue-700 font-bold text-xs px-2 py-0.5 rounded border border-blue-200">${item.etd}</span>`
           : `<span class="text-gray-400 text-xs">---</span>`;
 
-        // ĐỊNH DẠNG HIỂN THỊ CỘT DEADLINE
         const deadlineDisplay = getDeadlineBadge(item.deadline);
-
         const countryDisplay = item.country || '---';
 
         const formValue = getFormByCountry(countryDisplay);
@@ -484,7 +474,6 @@
           <td class="py-3 px-4">${missingDisplay}</td>
           
           <td class="py-3 px-4 text-center">${etdDisplay}</td>
-          <!-- CỘT DEADLINE NẰM SAU CỘT ETD -->
           <td class="py-3 px-4 text-center">${deadlineDisplay}</td>
           <td class="py-3 px-4 text-center">${billDisplay}</td>
           
