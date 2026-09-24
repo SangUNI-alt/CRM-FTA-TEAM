@@ -142,8 +142,9 @@
             <th class="py-3 px-4">ECIS</th>
             <th class="py-3 px-4">Tờ Khai</th>
             <th class="py-3 px-4">FILE THIẾU</th>
-            <!-- CỘT ETD NẰM TRƯỚC CỘT BILL -->
             <th class="py-3 px-4 text-center">ETD</th>
+            <!-- CỘT DEADLINE BỔ SUNG NGAY SAU ETD -->
+            <th class="py-3 px-4 text-center">DEADLINE</th>
             <th class="py-3 px-4 text-center">BILL</th>
             <th class="py-3 px-4 text-center w-12"></th>
           </tr>
@@ -215,6 +216,34 @@
       if (!countryStr || countryStr === '---') return '---';
       const cleanCountry = countryStr.trim().toUpperCase();
       return COUNTRY_FORM_MAP[cleanCountry] || '---';
+    }
+
+    // HÀM MỚI BỔ SUNG: XỬ LÝ BADGE TÔ MÀU CỘT DEADLINE
+    function getDeadlineBadge(deadlineStr) {
+      if (!deadlineStr || deadlineStr === '---') {
+        return `<span class="text-gray-400 text-xs">---</span>`;
+      }
+
+      // 1. Quá hạn (OVER ... DAYS) -> Tô Màu Đỏ
+      if (deadlineStr.startsWith('OVER')) {
+        return `<span class="inline-block bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">${deadlineStr}</span>`;
+      }
+
+      // 2. Chưa quá hạn (... DAYS) -> Tô màu dựa trên số ngày còn lại
+      const match = deadlineStr.match(/^(\d+)\s*DAYS$/);
+      if (match) {
+        const days = parseInt(match[1], 10);
+        if (days === 0 || days === 1) {
+          // 0 DAYS và 1 DAYS -> Tô Màu Đỏ
+          return `<span class="inline-block bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">${deadlineStr}</span>`;
+        } else if (days === 2 || days === 3) {
+          // 2 DAYS và 3 DAYS -> Tô Màu Vàng
+          return `<span class="inline-block bg-amber-400 text-slate-900 font-bold text-xs px-2 py-0.5 rounded shadow-sm">${deadlineStr}</span>`;
+        }
+      }
+
+      // > 3 DAYS -> Giữ màu bình thường
+      return `<span class="inline-block bg-slate-100 text-slate-700 font-semibold text-xs px-2 py-0.5 rounded border border-slate-200">${deadlineStr}</span>`;
     }
 
     let globalData = [];
@@ -392,7 +421,7 @@
       tbody.innerHTML = '';
 
       if (filteredData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
         renderPagination(0);
         return;
       }
@@ -430,6 +459,9 @@
           ? `<span class="inline-block bg-blue-50 text-blue-700 font-bold text-xs px-2 py-0.5 rounded border border-blue-200">${item.etd}</span>`
           : `<span class="text-gray-400 text-xs">---</span>`;
 
+        // ĐỊNH DẠNG HIỂN THỊ CỘT DEADLINE
+        const deadlineDisplay = getDeadlineBadge(item.deadline);
+
         const countryDisplay = item.country || '---';
 
         const formValue = getFormByCountry(countryDisplay);
@@ -451,8 +483,9 @@
           <td class="py-3 px-4 font-mono text-emerald-700 font-medium">${declarationDisplay}</td>
           <td class="py-3 px-4">${missingDisplay}</td>
           
-          <!-- CỘT ETD TRƯỚC CỘT BILL -->
           <td class="py-3 px-4 text-center">${etdDisplay}</td>
+          <!-- CỘT DEADLINE NẰM SAU CỘT ETD -->
+          <td class="py-3 px-4 text-center">${deadlineDisplay}</td>
           <td class="py-3 px-4 text-center">${billDisplay}</td>
           
           <td class="py-3 px-4 text-center">
