@@ -301,13 +301,24 @@
     const SUPABASE_URL = "http://localhost:8000";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
     
+    // Tắt hoàn toàn Realtime WebSocket để tránh bị Browser chặn kết nối Local Network
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      realtime: {
+        timeout: 0,
+        params: { eventsPerSecond: 0 }
+      },
+      auth: { persistSession: false },
       global: {
         headers: {
           'ngrok-skip-browser-warning': 'true'
         }
       }
     });
+
+    // Ngắt hẳn kết nối WebSocket nếu SDK tự gọi ngầm
+    if (supabaseClient.realtime) {
+      supabaseClient.realtime.disconnect();
+    }
 
     // ---------------- LOGIC CHUYỂN TAB SIDEBAR ----------------
     function switchTab(tab) {
@@ -699,13 +710,6 @@
       document.getElementById('file-modal').classList.remove('flex');
     }
 
-    // Lắng nghe Realtime Supabase cho ecis_summary
-    supabaseClient
-      .channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ecis_summary' }, () => {
-        fetchData();
-      })
-      .subscribe();
 
     // Tải dữ liệu ban đầu cho CO TRACKING
     fetchData();
