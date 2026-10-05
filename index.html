@@ -3,36 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LOGISTICS HUB - CO TRACKING & ECOSYS 2026</title>
-  
-  <!-- Nhúng phông chữ Noto Serif từ Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  
+  <title>CO TRACKING SEDO 2026</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
-    /* Áp dụng phông chữ Noto Serif cho toàn bộ trang */
-    body {
-      font-family: 'Noto Serif', serif;
-    }
-
-    /* Tùy chỉnh gam màu Sidebar */
-    .bg-sidebar-main {
-      background-color: #265E9B; /* Màu tiêu đề & kẻ nhấn */
-    }
-    .bg-sidebar-accent {
-      background-color: #6EB1F9; /* Màu điểm nhấn phụ */
-    }
-    .text-sidebar-accent {
-      color: #6EB1F9; /* Màu chữ điểm nhấn phụ */
-    }
-    .border-sidebar-accent {
-      border-color: #6EB1F9;
-    }
-
     @keyframes billPulse {
       0%, 100% {
         opacity: 1;
@@ -50,229 +25,141 @@
     }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans antialiased">
+<body class="bg-gray-100 text-gray-800 font-sans antialiased">
 
-  <div class="flex min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 py-8">
     
-    <!-- ================= 1. SIDEBAR THANH CÔNG CỤ DỌC BÊN TRÁI ================= -->
-    <aside class="w-64 bg-sidebar-main text-white flex flex-col shrink-0 border-r border-blue-900 min-h-screen shadow-lg">
-      <div class="p-5 border-b border-white/20 flex items-center gap-3">
-        <!-- Logo sử dụng màu điểm nhấn phụ #6EB1F9 -->
-        <div class="bg-sidebar-accent text-slate-900 font-bold p-2 rounded-lg text-lg shadow-sm">CO</div>
-        <div>
-          <h1 class="font-bold text-white text-base tracking-wide">LOGISTICS HUB</h1>
-          <!-- Chữ mô tả dùng màu điểm nhấn phụ #6EB1F9 -->
-          <p class="text-[11px] text-sidebar-accent font-semibold">System Dashboard v2.0</p>
-        </div>
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+      <div>
+        <h1 class="text-3xl font-bold text-slate-800">CO TRACKING SEDO 2026</h1>
+        <p class="text-sm text-gray-500 mt-1">Theo dõi các loại chứng từ PDF thiếu, File Draft và Mã tờ khai thời gian thực</p>
       </div>
-
-      <!-- Navigation Links -->
-      <nav class="p-4 space-y-2 flex-1">
-        <button onclick="switchTab('co-tracking')" id="btn-tab-co" 
-          class="w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 bg-sidebar-accent text-slate-900 shadow-md transition">
-          <span>📦</span>
-          <span>CO TRACKING 2026</span>
+      <div class="flex items-center gap-2">
+        <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <span class="w-2 h-2 mr-2 bg-green-500 rounded-full animate-ping"></span> Realtime Active
+        </span>
+        <button onclick="triggerSyncAndReload()" class="bg-slate-800 hover:bg-slate-700 text-white text-sm px-4 py-2 rounded-lg transition">
+          🔄 Tải lại
         </button>
-
-        <button onclick="switchTab('ecosys')" id="btn-tab-ecosys" 
-          class="w-full text-left px-4 py-3 rounded-lg font-semibold flex items-center gap-3 text-white/80 hover:bg-white/10 hover:text-white transition">
-          <span>🌐</span>
-          <span>ECOSYS MOIT</span>
-        </button>
-      </nav>
-
-      <div class="p-4 border-t border-white/20 text-[11px] text-sidebar-accent text-center font-medium">
-        © 2026 SEDO VINA Logistics
       </div>
-    </aside>
+    </div>
 
-    <!-- ================= 2. KHU VỰC NỘI DUNG CHÍNH (BÊN PHẢI) ================= -->
-    <main class="flex-1 p-8 overflow-y-auto">
+    <!-- KPI STATS CARDS -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+        <p class="text-xs font-medium text-gray-500 uppercase">Tổng ECIS Đã Quét</p>
+        <p id="stat-total" class="text-2xl font-bold text-gray-800 mt-1">0</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+        <p class="text-xs font-medium text-gray-500 uppercase">ECIS Đã Đủ Hồ Sơ (Full)</p>
+        <p id="stat-ready" class="text-2xl font-bold text-green-600 mt-1">0</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+        <p class="text-xs font-medium text-gray-500 uppercase">ECIS Chưa Đủ Hồ Sơ</p>
+        <p id="stat-missing" class="text-2xl font-bold text-amber-600 mt-1">0</p>
+      </div>
+    </div>
+
+    <!-- BỘ LỌC VÀ TÌM KIẾM NÂNG CAO -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col gap-4">
       
-      <!-- TAB 1: CO TRACKING SEDO 2026 -->
-      <div id="section-co-tracking">
+      <div class="flex flex-col md:flex-row gap-3 justify-between items-start">
+        <div class="w-full md:w-1/2">
+          <textarea id="search-input" oninput="filterData()" rows="2" placeholder="🔍 Tìm kiếm ECIS (Hỗ trợ nhập/dán nhiều mã phân cách bằng xuống dòng hoặc dấu phẩy)..." 
+                 class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+        </div>
         
-        <!-- HEADER -->
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-          <div>
-            <h1 class="text-3xl font-bold text-slate-800">CO TRACKING SEDO 2026</h1>
-            <p class="text-sm text-gray-500 mt-1">Theo dõi các loại chứng từ PDF thiếu, File Draft và Mã tờ khai thời gian thực</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              <span class="w-2 h-2 mr-2 bg-green-500 rounded-full animate-ping"></span> Realtime Active
-            </span>
-            <button onclick="triggerSyncAndReload()" class="bg-slate-800 hover:bg-slate-700 text-white text-sm px-4 py-2 rounded-lg transition">
-              🔄 Tải lại
-            </button>
-          </div>
-        </div>
+        <div class="flex gap-2 w-full md:w-auto flex-wrap md:flex-nowrap">
+          <select id="category-filter" onchange="filterData()" class="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="ALL">Tất cả TYPE (FCL/LCL)</option>
+            <option value="FCL">Chỉ FCL</option>
+            <option value="LCL">Chỉ LCL</option>
+          </select>
 
-        <!-- KPI STATS CARDS -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <p class="text-xs font-medium text-gray-500 uppercase">Tổng ECIS Đã Quét</p>
-            <p id="stat-total" class="text-2xl font-bold text-gray-800 mt-1">0</p>
-          </div>
-          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <p class="text-xs font-medium text-gray-500 uppercase">ECIS Đã Đủ Hồ Sơ (Full)</p>
-            <p id="stat-ready" class="text-2xl font-bold text-green-600 mt-1">0</p>
-          </div>
-          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <p class="text-xs font-medium text-gray-500 uppercase">ECIS Chưa Đủ Hồ Sơ</p>
-            <p id="stat-missing" class="text-2xl font-bold text-amber-600 mt-1">0</p>
-          </div>
-        </div>
-
-        <!-- BỘ LỌC VÀ TÌM KIẾM NÂNG CAO -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col gap-4">
+          <select id="form-filter" onchange="filterData()" class="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-amber-50/50 font-medium">
+            <option value="ALL">Tất cả FORM</option>
+            <option value="EUR1">Form EUR1</option>
+            <option value="CPTPP">Form CPTPP</option>
+            <option value="D">Form D</option>
+            <option value="E">Form E</option>
+            <option value="VJ">Form VJ</option>
+            <option value="AI">Form AI</option>
+            <option value="B">Form B</option>
+            <option value="NO">Form NO (Không C/O)</option>
+          </select>
           
-          <div class="flex flex-col md:flex-row gap-3 justify-between items-start">
-            <div class="w-full md:w-1/2">
-              <textarea id="search-input" oninput="filterData()" rows="2" placeholder="🔍 Tìm kiếm ECIS (Hỗ trợ nhập/dán nhiều mã phân cách bằng xuống dòng hoặc dấu phẩy)..." 
-                     class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
-            </div>
-            
-            <div class="flex gap-2 w-full md:w-auto flex-wrap md:flex-nowrap">
-              <select id="category-filter" onchange="filterData()" class="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="ALL">Tất cả TYPE (FCL/LCL)</option>
-                <option value="FCL">Chỉ FCL</option>
-                <option value="LCL">Chỉ LCL</option>
-              </select>
-
-              <select id="form-filter" onchange="filterData()" class="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-amber-50/50 font-medium">
-                <option value="ALL">Tất cả FORM</option>
-                <option value="EUR1">Form EUR1</option>
-                <option value="CPTPP">Form CPTPP</option>
-                <option value="D">Form D</option>
-                <option value="E">Form E</option>
-                <option value="VJ">Form VJ</option>
-                <option value="AI">Form AI</option>
-                <option value="B">Form B</option>
-                <option value="NO">Form NO (Không C/O)</option>
-              </select>
-              
-              <select id="bill-filter" onchange="filterData()" class="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="ALL">Tất cả BILL</option>
-                <option value="HAS_BILL">Đã Có BILL</option>
-                <option value="NO_BILL">Chưa Có BILL</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="pt-3 border-t flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-lg">
-            <span class="text-xs font-bold text-slate-600 uppercase">Bộ lọc File Thiếu:</span>
-            
-            <select id="status-filter" onchange="filterData()" class="px-3 py-1.5 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="ALL">Tất cả trạng thái hồ sơ</option>
-              <option value="FULL">Hồ sơ Full (Đủ 100%)</option>
-              <option value="MISSING">Hồ sơ còn thiếu chứng từ</option>
-            </select>
-
-            <div class="flex items-center gap-2 border-l pl-3">
-              <span class="text-xs text-slate-500">Lọc chi tiết file:</span>
-              <select id="doc-type-filter" onchange="filterData()" class="px-2.5 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                <option value="ALL">-- Chọn chứng từ --</option>
-                <option value="BK">BK</option>
-                <option value="DRAFT">DRAFT</option>
-                <option value="PLX">PLX</option>
-                <option value="TKN+VAT">TKN+VAT</option>
-                <option value="QTSX">QTSX</option>
-                <option value="PL">PL</option>
-                <option value="INV">INV</option>
-                <option value="TOKHAI">Tờ khai</option>
-              </select>
-
-              <select id="doc-status-filter" onchange="filterData()" class="px-2.5 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                <option value="HAS_NOT">⚠️ Chưa có</option>
-                <option value="HAS">✅ Đã có</option>
-              </select>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- BẢNG DỮ LIỆU TỔNG HỢP ECIS -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <table class="w-full text-left border-collapse text-sm">
-            <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold border-b">
-              <tr>
-                <th class="py-3 px-4 text-center w-12">No.</th>
-                <th class="py-3 px-4">TYPE</th>
-                <th class="py-3 px-4 text-center">Date PL</th>
-                <th class="py-3 px-4">Country</th>
-                <th class="py-3 px-4 text-center">FORM</th>
-                <th class="py-3 px-4">ECIS</th>
-                <th class="py-3 px-4">Tờ Khai</th>
-                <th class="py-3 px-4">FILE THIẾU</th>
-                <th class="py-3 px-4 text-center">ETD</th>
-                <th class="py-3 px-4 text-center">DEADLINE</th>
-                <th class="py-3 px-4 text-center">BILL</th>
-                <th class="py-3 px-4 text-center w-12"></th>
-              </tr>
-            </thead>
-            <tbody id="table-body" class="divide-y divide-gray-100">
-              <!-- Dữ liệu render bằng JS -->
-            </tbody>
-          </table>
-
-          <!-- THANH PHÂN TRANG -->
-          <div class="p-4 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
-            <span id="page-info" class="text-xs text-gray-500 font-medium">Hiển thị 0 - 0 trong tổng số 0 ECIS</span>
-            <div id="pagination-controls" class="flex items-center gap-1.5"></div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- TAB 2: ECOSYS MOIT (BẢNG DỮ LIỆU 11 CỘT) -->
-      <div id="section-ecosys" class="hidden">
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          
-          <div class="flex justify-between items-center mb-6 border-b pb-4">
-            <div>
-              <h2 class="text-xl font-bold text-slate-800">Cơ Sở Dữ Liệu ECOSYS (Bộ Công Thương)</h2>
-              <p class="text-xs text-slate-500 mt-1">Dữ liệu hồ sơ C/O cấp phép tự động đồng bộ từ Dịch vụ công</p>
-            </div>
-
-            <button onclick="triggerEcosysBotImmediately()" id="btn-sync-ecosys" 
-              class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition shadow-sm">
-              <svg class="w-4 h-4 animate-spin hidden" id="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"></circle>
-                <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" class="opacity-75"></path>
-              </svg>
-              <span>⚡ Tải Lại Dữ Liệu Ngay</span>
-            </button>
-          </div>
-
-          <!-- BẢNG HIỂN THỊ 11 CỘT chuẩn ECOSYS -->
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
-                <tr>
-                  <th class="py-3 px-3">STT</th>
-                  <th class="py-3 px-3">Số Tiếp Nhận</th>
-                  <th class="py-3 px-3">Số C/O</th>
-                  <th class="py-3 px-3">Mẫu C/O</th>
-                  <th class="py-3 px-3">Ngày Cấp Số</th>
-                  <th class="py-3 px-3">Số Tờ Khai HQ</th>
-                  <th class="py-3 px-3">Trạng Thái</th>
-                  <th class="py-3 px-3">Ngày Khai</th>
-                  <th class="py-3 px-3">Ngày Duyệt</th>
-                  <th class="py-3 px-3">Ngày Cấp Phép</th>
-                  <th class="py-3 px-3">Doanh Nghiệp Ký</th>
-                </tr>
-              </thead>
-              <tbody id="ecosys-table-body" class="divide-y divide-slate-100 text-slate-700">
-                <!-- Dữ liệu render từ JS ECOSYS -->
-              </tbody>
-            </table>
-          </div>
-
+          <select id="bill-filter" onchange="filterData()" class="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="ALL">Tất cả BILL</option>
+            <option value="HAS_BILL">Đã Có BILL</option>
+            <option value="NO_BILL">Chưa Có BILL</option>
+          </select>
         </div>
       </div>
 
-    </main>
+      <div class="pt-3 border-t flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-lg">
+        <span class="text-xs font-bold text-slate-600 uppercase">Bộ lọc File Thiếu:</span>
+        
+        <select id="status-filter" onchange="filterData()" class="px-3 py-1.5 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+          <option value="ALL">Tất cả trạng thái hồ sơ</option>
+          <option value="FULL">Hồ sơ Full (Đủ 100%)</option>
+          <option value="MISSING">Hồ sơ còn thiếu chứng từ</option>
+        </select>
+
+        <div class="flex items-center gap-2 border-l pl-3">
+          <span class="text-xs text-slate-500">Lọc chi tiết file:</span>
+          <select id="doc-type-filter" onchange="filterData()" class="px-2.5 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <option value="ALL">-- Chọn chứng từ --</option>
+            <option value="BK">BK</option>
+            <option value="DRAFT">DRAFT</option>
+            <option value="PLX">PLX</option>
+            <option value="TKN+VAT">TKN+VAT</option>
+            <option value="QTSX">QTSX</option>
+            <option value="PL">PL</option>
+            <option value="INV">INV</option>
+            <option value="TOKHAI">Tờ khai</option>
+          </select>
+
+          <select id="doc-status-filter" onchange="filterData()" class="px-2.5 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <option value="HAS_NOT">⚠️ Chưa có</option>
+            <option value="HAS">✅ Đã có</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BẢNG DỮ LIỆU TỔNG HỢP -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <table class="w-full text-left border-collapse text-sm">
+        <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold border-b">
+          <tr>
+            <th class="py-3 px-4 text-center w-12">No.</th>
+            <th class="py-3 px-4">TYPE</th>
+            <th class="py-3 px-4 text-center">Date PL</th>
+            <th class="py-3 px-4">Country</th>
+            <th class="py-3 px-4 text-center">FORM</th>
+            <th class="py-3 px-4">ECIS</th>
+            <th class="py-3 px-4">Tờ Khai</th>
+            <th class="py-3 px-4">FILE THIẾU</th>
+            <th class="py-3 px-4 text-center">ETD</th>
+            <th class="py-3 px-4 text-center">DEADLINE</th>
+            <th class="py-3 px-4 text-center">BILL</th>
+            <th class="py-3 px-4 text-center w-12"></th>
+          </tr>
+        </thead>
+        <tbody id="table-body" class="divide-y divide-gray-100">
+          <!-- Dữ liệu render bằng JS -->
+        </tbody>
+      </table>
+
+      <!-- THANH PHÂN TRANG -->
+      <div class="p-4 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
+        <span id="page-info" class="text-xs text-gray-500 font-medium">Hiển thị 0 - 0 trong tổng số 0 ECIS</span>
+        <div id="pagination-controls" class="flex items-center gap-1.5"></div>
+      </div>
+    </div>
+
   </div>
 
   <!-- MODAL XEM CHI TIẾT FILE -->
@@ -295,19 +182,11 @@
     </div>
   </div>
 
-  <!-- ================= 3. SCRIPT XỬ LÝ LOGIC HOÀN CHỈNH ================= -->
   <script>
-   // ---------------- CẤU HÌNH SUPABASE CLIENT (CHUẨN LOCAL & NGROK) ----------------
-    const SUPABASE_URL = "https://carrousel-liking-mannish.ngrok-free.dev/";
+    const SUPABASE_URL = "https://carrousel-liking-mannish.ngrok-free.dev";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
     
-    // Tắt hoàn toàn Realtime WebSocket để tránh bị Browser chặn kết nối Local Network
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-      realtime: {
-        timeout: 0,
-        params: { eventsPerSecond: 0 }
-      },
-      auth: { persistSession: false },
       global: {
         headers: {
           'ngrok-skip-browser-warning': 'true'
@@ -315,33 +194,6 @@
       }
     });
 
-    // Ngắt hẳn kết nối WebSocket nếu SDK tự gọi ngầm
-    if (supabaseClient.realtime) {
-      supabaseClient.realtime.disconnect();
-    }
-
-    // ---------------- LOGIC CHUYỂN TAB SIDEBAR ----------------
-    function switchTab(tab) {
-      const coSection = document.getElementById('section-co-tracking');
-      const ecosysSection = document.getElementById('section-ecosys');
-      const btnCo = document.getElementById('btn-tab-co');
-      const btnEcosys = document.getElementById('btn-tab-ecosys');
-
-      if (tab === 'co-tracking') {
-        coSection.classList.remove('hidden');
-        ecosysSection.classList.add('hidden');
-        btnCo.className = "w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 bg-sidebar-accent text-slate-900 shadow-md transition";
-        btnEcosys.className = "w-full text-left px-4 py-3 rounded-lg font-semibold flex items-center gap-3 text-white/80 hover:bg-white/10 hover:text-white transition";
-      } else {
-        coSection.classList.add('hidden');
-        ecosysSection.classList.remove('hidden');
-        btnEcosys.className = "w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 bg-sidebar-accent text-slate-900 shadow-md transition";
-        btnCo.className = "w-full text-left px-4 py-3 rounded-lg font-semibold flex items-center gap-3 text-white/80 hover:bg-white/10 hover:text-white transition";
-        fetchEcosysData();
-      }
-    }
-
-    // ---------------- LOGIC CO TRACKING SEDO 2026 ----------------
     const COUNTRY_FORM_MAP = {
       'GB': 'EUR1', 'UNITED KINGDOM': 'EUR1', 'UK': 'EUR1',
       'NL': 'NETHERLANDS', 'NETHERLANDS': 'EUR1',
@@ -404,15 +256,14 @@
       if (syncBtn) syncBtn.innerText = "⏳ Đang quét 40 ECIS...";
 
       try {
-        const res = await fetch("http://localhost:3000/run-sync", {
-          headers: { 'ngrok-skip-browser-warning': 'true' }
-        });
+        const res = await fetch('http://localhost:3000/run-sync');
         const result = await res.json();
+        
         if (!result.success) {
           alert("⚠️ Lỗi đồng bộ: " + result.message);
         }
       } catch (err) {
-        console.warn("Chưa bật server local (server.js). Sẽ tải lại dữ liệu trực tiếp từ Supabase.");
+        console.warn("Chưa bật server local (server.js). Sẽ chỉ tải lại dữ liệu từ Supabase.");
       }
 
       await fetchData();
@@ -710,69 +561,14 @@
       document.getElementById('file-modal').classList.remove('flex');
     }
 
+    supabaseClient
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ecis_summary' }, () => {
+        fetchData();
+      })
+      .subscribe();
 
-    // Tải dữ liệu ban đầu cho CO TRACKING
     fetchData();
-
-    // ---------------- LOGIC TRUY VẤN ECOSYS 11 CỘT ----------------
-    async function fetchEcosysData() {
-      const { data, error } = await supabaseClient
-        .from('ecosys_data')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Lỗi lấy dữ liệu ECOSYS:", error.message);
-        return;
-      }
-
-      const tbody = document.getElementById('ecosys-table-body');
-      if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-slate-400 font-medium">Chưa có dữ liệu ECOSYS trong hệ thống.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = data.map((item, index) => `
-        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-          <td class="py-3 px-3 font-medium text-slate-400">${index + 1}</td>
-          <td class="py-3 px-3 font-semibold text-slate-800">${item.so_tiep_nhan || '---'}</td>
-          <td class="py-3 px-3 font-bold text-blue-600">${item.so_co || '---'}</td>
-          <td class="py-3 px-3"><span class="bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2 py-0.5 rounded">${item.mau_co || '---'}</span></td>
-          <td class="py-3 px-3">${formatDate(item.ngay_cap_so)}</td>
-          <td class="py-3 px-3 font-mono text-emerald-700">${item.so_to_khai || '---'}</td>
-          <td class="py-3 px-3"><span class="bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold px-2 py-0.5 rounded">${item.trang_thai || 'Đã duyệt'}</span></td>
-          <td class="py-3 px-3">${formatDate(item.ngay_khai)}</td>
-          <td class="py-3 px-3">${formatDate(item.ngay_duyet)}</td>
-          <td class="py-3 px-3">${formatDate(item.ngay_cap_phe_duyet)}</td>
-          <td class="py-3 px-3 font-medium text-slate-700">${item.doanh_nghiep_ky || '---'}</td>
-        </tr>
-      `).join('');
-    }
-
-    function formatDate(dateStr) {
-      if (!dateStr) return '---';
-      return new Date(dateStr).toLocaleDateString('vi-VN');
-    }
-
-    async function triggerEcosysBotImmediately() {
-      const spinIcon = document.getElementById('spin-icon');
-      spinIcon.classList.remove('hidden');
-
-      try {
-        const response = await fetch('YOUR_GITHUB_WORKFLOW_DISPATCH_URL', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true'
-          }
-        });
-        alert("🚀 Đã gửi yêu cầu cào dữ liệu ECOSYS! Vui lòng chờ 1-2 phút sau đó nhấn tải lại trang.");
-      } catch (err) {
-        alert("⚠️ Không thể kết nối tới dịch vụ cào dữ liệu.");
-      } finally {
-        spinIcon.classList.add('hidden');
-      }
-    }
   </script>
 </body>
 </html>
