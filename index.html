@@ -48,6 +48,17 @@
     .bill-active-anim {
       animation: billPulse 1.8s infinite ease-in-out;
     }
+
+    /* Hiệu ứng mượt khi đóng/mở sidebar */
+    aside {
+      transition: width 0.3s ease, padding 0.3s ease;
+    }
+    aside.collapsed {
+      width: 0 !important;
+      padding: 0 !important;
+      overflow: hidden;
+      border: none;
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans antialiased">
@@ -55,33 +66,33 @@
   <div class="flex min-h-screen">
     
     <!-- ================= 1. SIDEBAR THANH CÔNG CỤ DỌC BÊN TRÁI ================= -->
-    <aside class="w-64 bg-sidebar-main text-white flex flex-col shrink-0 border-r border-blue-900 min-h-screen shadow-lg">
-      <div class="p-5 border-b border-white/20 flex items-center gap-3">
-        <!-- Logo sử dụng màu điểm nhấn phụ #6EB1F9 -->
-        <div class="bg-sidebar-accent text-slate-900 font-bold p-2 rounded-lg text-lg shadow-sm">CO</div>
+    <aside id="main-sidebar" class="w-44 bg-sidebar-main text-white flex flex-col shrink-0 border-r border-blue-900 min-h-screen shadow-lg relative">
+      <div class="p-3 border-b border-white/20 flex items-center gap-2">
+        <!-- Logo UNI bằng ảnh (Lưu ảnh đính kèm của bạn tên logo-uni.png vào cùng thư mục) -->
+        <div class="bg-white p-1 rounded-lg shadow-sm w-9 h-9 flex items-center justify-center shrink-0 overflow-hidden">
+          <img src="logo-uni.png" alt="UNI Logo" class="w-full h-full object-contain">
+        </div>
         <div>
-          <h1 class="font-bold text-white text-base tracking-wide">LOGISTICS HUB</h1>
-          <!-- Chữ mô tả dùng màu điểm nhấn phụ #6EB1F9 -->
-          <p class="text-[11px] text-sidebar-accent font-semibold">System Dashboard v2.0</p>
+          <h1 class="font-bold text-white text-sm tracking-wide leading-tight">CRM FTA TEAM</h1>
         </div>
       </div>
 
       <!-- Navigation Links -->
-      <nav class="p-4 space-y-2 flex-1">
+      <nav class="p-2 space-y-2 flex-1">
         <button onclick="switchTab('co-tracking')" id="btn-tab-co" 
-          class="w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 bg-sidebar-accent text-slate-900 shadow-md transition">
+          class="w-full text-left px-3 py-2.5 rounded-lg font-bold flex items-center gap-2 bg-sidebar-accent text-slate-900 shadow-md transition text-xs">
           <span>📦</span>
           <span>CO TRACKING 2026</span>
         </button>
 
         <button onclick="switchTab('ecosys')" id="btn-tab-ecosys" 
-          class="w-full text-left px-4 py-3 rounded-lg font-semibold flex items-center gap-3 text-white/80 hover:bg-white/10 hover:text-white transition">
+          class="w-full text-left px-3 py-2.5 rounded-lg font-semibold flex items-center gap-2 text-white/80 hover:bg-white/10 hover:text-white transition text-xs">
           <span>🌐</span>
           <span>ECOSYS MOIT</span>
         </button>
       </nav>
 
-      <div class="p-4 border-t border-white/20 text-[11px] text-sidebar-accent text-center font-medium">
+      <div class="p-3 border-t border-white/20 text-[10px] text-sidebar-accent text-center font-medium">
         © 2026 SEDO VINA Logistics
       </div>
     </aside>
@@ -92,11 +103,18 @@
       <!-- TAB 1: CO TRACKING SEDO 2026 -->
       <div id="section-co-tracking">
         
-        <!-- HEADER -->
+       <!-- HEADER -->
         <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-          <div>
-            <h1 class="text-3xl font-bold text-slate-800">CO TRACKING SEDO 2026</h1>
-            <p class="text-sm text-gray-500 mt-1">Theo dõi các loại chứng từ PDF thiếu, File Draft và Mã tờ khai thời gian thực</p>
+          <div class="flex items-center gap-3">
+            <!-- Nút bấm ẩn/hiện Sidebar dài ra -->
+            <button onclick="toggleSidebar()" title="Ẩn/Hiện thanh menu" 
+              class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm font-bold shadow transition flex items-center gap-1">
+              <span>☰</span> Menu
+            </button>
+            <div>
+              <h1 class="text-3xl font-bold text-slate-800">CO TRACKING SEDO 2026</h1>
+              <p class="text-sm text-gray-500 mt-1">Theo dõi các loại chứng từ PDF thiếu, File Draft và Mã tờ khai thời gian thực</p>
+            </div>
           </div>
           <div class="flex items-center gap-2">
             <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -318,6 +336,12 @@
     // Ngắt hẳn kết nối WebSocket nếu SDK tự gọi ngầm
     if (supabaseClient.realtime) {
       supabaseClient.realtime.disconnect();
+    }
+    
+    // ---------------- LOGIC ẨN/HIỆN SIDEBAR ----------------
+    function toggleSidebar() {
+      const sidebar = document.getElementById('main-sidebar');
+      sidebar.classList.toggle('collapsed');
     }
 
     // ---------------- LOGIC CHUYỂN TAB SIDEBAR ----------------
