@@ -19,7 +19,7 @@
       font-family: 'Noto Serif', serif;
     }
 
-    /* Tùy chỉnh gam màu Sidebar chính xác theo yêu cầu */
+    /* Tùy chỉnh gam màu Sidebar */
     .bg-sidebar-main {
       background-color: #265E9B; /* Màu tiêu đề & kẻ nhấn */
     }
@@ -89,7 +89,7 @@
     <!-- ================= 2. KHU VỰC NỘI DUNG CHÍNH (BÊN PHẢI) ================= -->
     <main class="flex-1 p-8 overflow-y-auto">
       
-      <!-- TAB 1: CO TRACKING SEDO 2026 (GIỮ NGUYÊN TOÀN BỘ LOGIC VÀ CÁC THẺ GỐC) -->
+      <!-- TAB 1: CO TRACKING SEDO 2026 -->
       <div id="section-co-tracking">
         
         <!-- HEADER -->
@@ -212,7 +212,7 @@
               </tr>
             </thead>
             <tbody id="table-body" class="divide-y divide-gray-100">
-              <!-- Dữ liệu render bằng JS gốc -->
+              <!-- Dữ liệu render bằng JS -->
             </tbody>
           </table>
 
@@ -275,7 +275,7 @@
     </main>
   </div>
 
-  <!-- MODAL XEM CHI TIẾT FILE (GIỮ NGUYÊN TỪ FILE GỐC) -->
+  <!-- MODAL XEM CHI TIẾT FILE -->
   <div id="file-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
       <div class="p-4 border-b flex justify-between items-center">
@@ -295,19 +295,16 @@
     </div>
   </div>
 
-  <!-- ================= 3. SCRIPT XỬ LÝ LOGIC (TOÀN BỘ CODE GỐC + TAB SWITCH) ================= -->
+  <!-- ================= 3. SCRIPT XỬ LÝ LOGIC HOÀN CHỈNH ================= -->
   <script>
+   // ---------------- CẤU HÌNH SUPABASE CLIENT (CHUẨN LOCAL & NGROK) ----------------
     const SUPABASE_URL = "http://localhost:8000";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY4MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
     
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-      auth: {
-        persistSession: false
-      },
       global: {
         headers: {
-          'ngrok-skip-browser-warning': 'true',
-          'Access-Control-Allow-Origin': '*'
+          'ngrok-skip-browser-warning': 'true'
         }
       }
     });
@@ -333,7 +330,7 @@
       }
     }
 
-    // ---------------- LOGIC CO TRACKING 2026 GỐC ----------------
+    // ---------------- LOGIC CO TRACKING SEDO 2026 ----------------
     const COUNTRY_FORM_MAP = {
       'GB': 'EUR1', 'UNITED KINGDOM': 'EUR1', 'UK': 'EUR1',
       'NL': 'NETHERLANDS', 'NETHERLANDS': 'EUR1',
@@ -396,14 +393,15 @@
       if (syncBtn) syncBtn.innerText = "⏳ Đang quét 40 ECIS...";
 
       try {
-        const res = await fetch('http://localhost:3000/run-sync');
+        const res = await fetch("http://localhost:3000/run-sync", {
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
         const result = await res.json();
-        
         if (!result.success) {
           alert("⚠️ Lỗi đồng bộ: " + result.message);
         }
       } catch (err) {
-        console.warn("Chưa bật server local (server.js). Sẽ chỉ tải lại dữ liệu từ Supabase.");
+        console.warn("Chưa bật server local (server.js). Sẽ tải lại dữ liệu trực tiếp từ Supabase.");
       }
 
       await fetchData();
@@ -759,7 +757,10 @@
       try {
         const response = await fetch('YOUR_GITHUB_WORKFLOW_DISPATCH_URL', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          }
         });
         alert("🚀 Đã gửi yêu cầu cào dữ liệu ECOSYS! Vui lòng chờ 1-2 phút sau đó nhấn tải lại trang.");
       } catch (err) {
