@@ -259,7 +259,7 @@
                 <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"></circle>
                 <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" class="opacity-75"></path>
               </svg>
-              <span>⚡ Tải Lại Dữ Liệu Ngay</span>
+              <span id="btn-ecosys-label">⚡ Loading Data</span>
             </button>
           </div>
 
@@ -319,6 +319,7 @@
     const SUPABASE_URL = "https://carrousel-liking-mannish.ngrok-free.dev";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
     
+    
     // Tắt hoàn toàn Realtime WebSocket để tránh bị Browser chặn kết nối Local Network
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
       realtime: {
@@ -346,21 +347,21 @@
 
     // ---------------- LOGIC CHUYỂN TAB SIDEBAR ----------------
     function switchTab(tab) {
-      const coSection = document.getElementById('section-co-tracking');
-      const ecosysSection = document.getElementById('section-ecosys');
       const btnCo = document.getElementById('btn-tab-co');
       const btnEcosys = document.getElementById('btn-tab-ecosys');
+      const sectionCo = document.getElementById('section-co-tracking');
+      const sectionEcosys = document.getElementById('section-ecosys');
 
       if (tab === 'co-tracking') {
-        coSection.classList.remove('hidden');
-        ecosysSection.classList.add('hidden');
-        btnCo.className = "w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 bg-sidebar-accent text-slate-900 shadow-md transition";
-        btnEcosys.className = "w-full text-left px-4 py-3 rounded-lg font-semibold flex items-center gap-3 text-white/80 hover:bg-white/10 hover:text-white transition";
+        sectionCo.classList.remove('hidden');
+        sectionEcosys.classList.add('hidden');
+        btnCo.className = "w-full text-left px-3 py-2.5 rounded-lg font-bold flex items-center gap-2 bg-sidebar-accent text-slate-900 shadow-md transition text-xs";
+        btnEcosys.className = "w-full text-left px-3 py-2.5 rounded-lg font-semibold flex items-center gap-2 text-white/80 hover:bg-white/10 hover:text-white transition text-xs";
       } else {
-        coSection.classList.add('hidden');
-        ecosysSection.classList.remove('hidden');
-        btnEcosys.className = "w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 bg-sidebar-accent text-slate-900 shadow-md transition";
-        btnCo.className = "w-full text-left px-4 py-3 rounded-lg font-semibold flex items-center gap-3 text-white/80 hover:bg-white/10 hover:text-white transition";
+        sectionCo.classList.add('hidden');
+        sectionEcosys.classList.remove('hidden');
+        btnEcosys.className = "w-full text-left px-3 py-2.5 rounded-lg font-bold flex items-center gap-2 bg-sidebar-accent text-slate-900 shadow-md transition text-xs";
+        btnCo.className = "w-full text-left px-3 py-2.5 rounded-lg font-semibold flex items-center gap-2 text-white/80 hover:bg-white/10 hover:text-white transition text-xs";
         fetchEcosysData();
       }
     }
@@ -778,25 +779,32 @@
       return new Date(dateStr).toLocaleDateString('vi-VN');
     }
 
-    async function triggerEcosysBotImmediately() {
-      const spinIcon = document.getElementById('spin-icon');
-      spinIcon.classList.remove('hidden');
+  async function triggerEcosysBotImmediately() {
+  const btn = document.getElementById('btn-sync-ecosys');
+  const label = document.getElementById('btn-ecosys-label');
+  const t0 = Date.now();
+  try {
+    const { error } = await supabaseClient.from('app_config')
+      .upsert({ key: 'scrape_request_at', value: String(t0), updated_at: new Date().toISOString() });
+    if (error) { alert("⚠️ Không gửi được yêu cầu: " + error.message); return; }
+  } catch (e) { alert("⚠️ Lỗi: " + e.message); return; }
 
+  // Hiện dữ liệu hiện có NGAY + báo đang cào nền (không bắt đứng chờ)
+  label.innerText = "⏳ Đang cào nền...";
+  await fetchEcosysData();
+
+  // Nền: chờ server báo xong rồi tự nạp lại (tối đa 3 phút), KHÔNG chặn nút
+  (async () => {
+    for (let i = 0; i < 36; i++) {
+      await new Promise(r => setTimeout(r, 5000));
       try {
-        const response = await fetch('YOUR_GITHUB_WORKFLOW_DISPATCH_URL', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true'
-          }
-        });
-        alert("🚀 Đã gửi yêu cầu cào dữ liệu ECOSYS! Vui lòng chờ 1-2 phút sau đó nhấn tải lại trang.");
-      } catch (err) {
-        alert("⚠️ Không thể kết nối tới dịch vụ cào dữ liệu.");
-      } finally {
-        spinIcon.classList.add('hidden');
-      }
+        const { data } = await supabaseClient.from('app_config').select('value').eq('key','scrape_last_done').maybeSingle();
+        if (data && Number(data.value) > t0) { await fetchEcosysData(); break; }
+      } catch (e) {}
     }
+    label.innerText = "⚡ Loading Data";
+  })();
+}
   </script>
 </body>
 </html>
