@@ -49,16 +49,33 @@
       animation: billPulse 1.8s infinite ease-in-out;
     }
 
-    /* Hiệu ứng mượt khi đóng/mở sidebar */
-    aside {
-      transition: width 0.3s ease, padding 0.3s ease;
+    /* ===== Sidebar dạng rail (thu gọn) + mở rộng ===== */
+    #main-sidebar { width: 88px; transition: width 0.3s ease; }
+    #main-sidebar.expanded { width: 176px; }
+
+    #main-sidebar .side-full { display: none; }
+    #main-sidebar.expanded .side-full { display: block; }
+
+    #main-sidebar .nav-item {
+      width: 100%; display: flex; align-items: center;
+      border-radius: 0.5rem; cursor: pointer;
+      transition: background-color 0.2s, color 0.2s;
     }
-    aside.collapsed {
-      width: 0 !important;
-      padding: 0 !important;
-      overflow: hidden;
-      border: none;
+    #main-sidebar:not(.expanded) .nav-item {
+      flex-direction: column; gap: 3px; justify-content: center;
+      text-align: center; padding: 8px 2px;
     }
+    #main-sidebar:not(.expanded) .nav-label { display: none; }
+    #main-sidebar:not(.expanded) .nav-short { display: block; font-size: 9px; line-height: 1.1; font-weight: 700; }
+
+    #main-sidebar.expanded .nav-item { flex-direction: row; gap: 0.5rem; text-align: left; padding: 0.625rem 0.75rem; }
+    #main-sidebar.expanded .nav-short { display: none; }
+    #main-sidebar.expanded .nav-label { display: inline; font-size: 0.75rem; }
+
+    #main-sidebar .nav-icon { font-size: 1.25rem; line-height: 1; }
+    #main-sidebar .nav-item.active { background-color: #6EB1F9; color: #0f172a; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+    #main-sidebar .nav-item:not(.active) { color: rgba(255,255,255,.8); font-weight: 600; }
+    #main-sidebar .nav-item:not(.active):hover { background-color: rgba(255,255,255,.1); color: #fff; }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans antialiased">
@@ -66,33 +83,36 @@
   <div class="flex min-h-screen">
     
     <!-- ================= 1. SIDEBAR THANH CÔNG CỤ DỌC BÊN TRÁI ================= -->
-    <aside id="main-sidebar" class="w-44 bg-sidebar-main text-white flex flex-col shrink-0 border-r border-blue-900 min-h-screen shadow-lg relative">
-      <div class="p-3 border-b border-white/20 flex items-center gap-2">
-        <!-- Logo UNI bằng ảnh (Lưu ảnh đính kèm của bạn tên logo-uni.png vào cùng thư mục) -->
-        <div class="bg-white p-1 rounded-lg shadow-sm w-9 h-9 flex items-center justify-center shrink-0 overflow-hidden">
+    <aside id="main-sidebar" class="bg-sidebar-main text-white flex flex-col shrink-0 border-r border-blue-900 min-h-screen shadow-lg relative">
+      <div class="p-3 border-b border-white/20 flex items-center justify-center gap-2">
+        <div class="bg-white p-1 rounded-lg shadow-sm w-[47px] h-[47px] flex items-center justify-center shrink-0 overflow-hidden">
           <img src="logo/logo-uni.png" alt="UNI Logo" class="w-full h-full object-contain">
         </div>
-        <div>
-          <h1 class="font-bold text-white text-sm tracking-wide leading-tight">CRM FTA TEAM</h1>
-        </div>
+        <h1 class="side-full font-bold text-white text-sm tracking-wide leading-tight">CRM FTA TEAM</h1>
       </div>
+
+      <!-- Nút mở/thu gọn (»  «) -->
+      <button onclick="toggleSidebar()" title="Mở/Thu gọn menu"
+        class="mx-auto mt-2 mb-1 w-[42px] h-[42px] flex items-center justify-center rounded-lg text-white/90 hover:bg-white/15 transition">
+        <span id="side-chevron" class="text-[1.6rem] font-bold leading-none">»</span>
+      </button>
 
       <!-- Navigation Links -->
       <nav class="p-2 space-y-2 flex-1">
-        <button onclick="switchTab('co-tracking')" id="btn-tab-co" 
-          class="w-full text-left px-3 py-2.5 rounded-lg font-bold flex items-center gap-2 bg-sidebar-accent text-slate-900 shadow-md transition text-xs">
-          <span>📦</span>
-          <span>CO TRACKING 2026</span>
+        <button onclick="switchTab('co-tracking')" id="btn-tab-co" class="nav-item active">
+          <span class="nav-icon">📦</span>
+          <span class="nav-label">CO TRACKING 2026</span>
+          <span class="nav-short">TRACKING</span>
         </button>
 
-        <button onclick="switchTab('ecosys')" id="btn-tab-ecosys" 
-          class="w-full text-left px-3 py-2.5 rounded-lg font-semibold flex items-center gap-2 text-white/80 hover:bg-white/10 hover:text-white transition text-xs">
-          <span>🌐</span>
-          <span>ECOSYS MOIT</span>
+        <button onclick="switchTab('ecosys')" id="btn-tab-ecosys" class="nav-item">
+          <span class="nav-icon">🌐</span>
+          <span class="nav-label">ECOSYS MOIT</span>
+          <span class="nav-short">ECOSYS</span>
         </button>
       </nav>
 
-      <div class="p-3 border-t border-white/20 text-[10px] text-sidebar-accent text-center font-medium">
+      <div class="side-full p-3 border-t border-white/20 text-[10px] text-sidebar-accent text-center font-medium">
         © 2026 SEDO VINA Logistics
       </div>
     </aside>
@@ -106,11 +126,6 @@
        <!-- HEADER -->
         <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
           <div class="flex items-center gap-3">
-            <!-- Nút bấm ẩn/hiện Sidebar dài ra -->
-            <button onclick="toggleSidebar()" title="Ẩn/Hiện thanh menu" 
-              class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm font-bold shadow transition flex items-center gap-1">
-              <span>☰</span> Menu
-            </button>
             <div>
               <h1 class="text-3xl font-bold text-slate-800">CO TRACKING SEDO 2026</h1>
               <p class="text-sm text-gray-500 mt-1">Theo dõi các loại chứng từ PDF thiếu, File Draft và Mã tờ khai thời gian thực</p>
@@ -120,8 +135,10 @@
             <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
               <span class="w-2 h-2 mr-2 bg-green-500 rounded-full animate-ping"></span> Realtime Active
             </span>
-            <button onclick="triggerSyncAndReload()" class="bg-slate-800 hover:bg-slate-700 text-white text-sm px-4 py-2 rounded-lg transition">
-              🔄 Tải lại
+            <button onclick="triggerSyncAndReload()" id="btn-sync-co"
+              class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-white w-11 h-11 rounded-lg transition shadow-sm flex items-center justify-center"
+              title="Tải lại dữ liệu CO (30 ngày gần nhất)">
+              <span id="btn-sync-co-label" class="text-2xl leading-none">⚡</span>
             </button>
           </div>
         </div>
@@ -167,7 +184,9 @@
                 <option value="VJ">Form VJ</option>
                 <option value="AI">Form AI</option>
                 <option value="B">Form B</option>
+                <option value="UAE">Form UAE</option>
                 <option value="NO">Form NO (Không C/O)</option>
+                <option value="NONE">⚠️ Chưa có Form (lỗi)</option>
               </select>
               
               <select id="bill-filter" onchange="filterData()" class="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -212,7 +231,8 @@
 
         <!-- BẢNG DỮ LIỆU TỔNG HỢP ECIS -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <table class="w-full text-left border-collapse text-sm">
+          <div class="overflow-x-auto">
+          <table class="w-full min-w-[1000px] text-left border-collapse text-sm">
             <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold border-b">
               <tr>
                 <th class="py-3 px-4 text-center w-12">No.</th>
@@ -220,6 +240,7 @@
                 <th class="py-3 px-4 text-center">Date PL</th>
                 <th class="py-3 px-4">Country</th>
                 <th class="py-3 px-4 text-center">FORM</th>
+                <th class="py-3 px-4 text-center">Số C/O</th>
                 <th class="py-3 px-4">ECIS</th>
                 <th class="py-3 px-4">Tờ Khai</th>
                 <th class="py-3 px-4">FILE THIẾU</th>
@@ -233,6 +254,7 @@
               <!-- Dữ liệu render bằng JS -->
             </tbody>
           </table>
+          </div>
 
           <!-- THANH PHÂN TRANG -->
           <div class="p-4 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -265,8 +287,8 @@
 
           <!-- BẢNG HIỂN THỊ 11 CỘT chuẩn ECOSYS -->
           <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
+            <table class="w-full min-w-[1200px] text-left border-collapse text-xs">
+              <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200 whitespace-nowrap">
                 <tr>
                   <th class="py-3 px-3">STT</th>
                   <th class="py-3 px-3">Số Tiếp Nhận</th>
@@ -285,6 +307,12 @@
                 <!-- Dữ liệu render từ JS ECOSYS -->
               </tbody>
             </table>
+          </div>
+
+          <!-- THANH PHÂN TRANG ECOSYS -->
+          <div class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <span id="ecosys-page-info" class="text-xs text-slate-500 font-medium">Hiển thị 0 hồ sơ</span>
+            <div id="ecosys-pagination" class="flex items-center gap-1.5 flex-wrap"></div>
           </div>
 
         </div>
@@ -316,7 +344,7 @@
   <!-- ================= 3. SCRIPT XỬ LÝ LOGIC HOÀN CHỈNH ================= -->
   <script>
    // ---------------- CẤU HÌNH SUPABASE CLIENT (CHUẨN LOCAL & NGROK) ----------------
-    const SUPABASE_URL = "https://carrousel-liking-mannish.ngrok-free.dev";
+    const SUPABASE_URL = "http://localhost:8000";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
     
     
@@ -342,7 +370,9 @@
     // ---------------- LOGIC ẨN/HIỆN SIDEBAR ----------------
     function toggleSidebar() {
       const sidebar = document.getElementById('main-sidebar');
-      sidebar.classList.toggle('collapsed');
+      sidebar.classList.toggle('expanded');
+      const chev = document.getElementById('side-chevron');
+      if (chev) chev.textContent = sidebar.classList.contains('expanded') ? '«' : '»';
     }
 
     // ---------------- LOGIC CHUYỂN TAB SIDEBAR ----------------
@@ -355,13 +385,13 @@
       if (tab === 'co-tracking') {
         sectionCo.classList.remove('hidden');
         sectionEcosys.classList.add('hidden');
-        btnCo.className = "w-full text-left px-3 py-2.5 rounded-lg font-bold flex items-center gap-2 bg-sidebar-accent text-slate-900 shadow-md transition text-xs";
-        btnEcosys.className = "w-full text-left px-3 py-2.5 rounded-lg font-semibold flex items-center gap-2 text-white/80 hover:bg-white/10 hover:text-white transition text-xs";
+        btnCo.classList.add('active');
+        btnEcosys.classList.remove('active');
       } else {
         sectionCo.classList.add('hidden');
         sectionEcosys.classList.remove('hidden');
-        btnEcosys.className = "w-full text-left px-3 py-2.5 rounded-lg font-bold flex items-center gap-2 bg-sidebar-accent text-slate-900 shadow-md transition text-xs";
-        btnCo.className = "w-full text-left px-3 py-2.5 rounded-lg font-semibold flex items-center gap-2 text-white/80 hover:bg-white/10 hover:text-white transition text-xs";
+        btnEcosys.classList.add('active');
+        btnCo.classList.remove('active');
         fetchEcosysData();
       }
     }
@@ -373,11 +403,11 @@
       'MY': 'D',    'MALAYSIA': 'D',
       'FR': 'EUR1', 'FRANCE': 'EUR1',
       'SE': 'EUR1', 'SWEDEN': 'EUR1',
-      'AE': 'NO',   'UNITED ARAB EMIRATES': 'NO', 'UAE': 'NO',
+      'AE': 'UAE',  'UNITED ARAB EMIRATES': 'UAE', 'UAE': 'UAE',
       'US': 'NO',   'UNITED STATES OF AMERICA': 'NO', 'USA': 'NO', 'UNITED STATES': 'NO',
       'DE': 'EUR1', 'GERMANY': 'EUR1',
       'CN': 'E',    'CHINA': 'E',
-      'TR': 'B',    'TURKEY': 'B',
+      'TR': 'B',    'TURKEY': 'B', 'TURKIYE': 'B', 'TRKIYE': 'B',
       'PL': 'EUR1', 'POLAND': 'EUR1',
       'ES': 'EUR1', 'SPAIN': 'EUR1',
       'IT': 'EUR1', 'ITALY': 'EUR1',
@@ -424,24 +454,61 @@
     let currentPage = 1;
     const itemsPerPage = 20;
 
-    async function triggerSyncAndReload() {
-      const syncBtn = document.querySelector('button[onclick="triggerSyncAndReload()"]');
-      if (syncBtn) syncBtn.innerText = "⏳ Đang quét 40 ECIS...";
+    // ---- Map "Số tờ khai -> Số C/O" lấy từ tab ECOSYS MOIT ----
+    let ecosysByToKhai = new Map();
 
-      try {
-        const res = await fetch("http://localhost:3000/run-sync", {
-          headers: { 'ngrok-skip-browser-warning': 'true' }
-        });
-        const result = await res.json();
-        if (!result.success) {
-          alert("⚠️ Lỗi đồng bộ: " + result.message);
-        }
-      } catch (err) {
-        console.warn("Chưa bật server local (server.js). Sẽ tải lại dữ liệu trực tiếp từ Supabase.");
+    // Dữ liệu + phân trang cho tab ECOSYS MOIT
+    let ecosysData = [];
+    let ecosysPage = 1;
+    const ecosysPerPage = 30;
+
+    function normDigits(s) {
+      return (s == null ? '' : String(s)).replace(/\D/g, '');
+    }
+
+    // Tách MỌI dãy số dài (số tờ khai) trong 1 chuỗi — ECOSYS có thể gộp nhiều TK/ô
+    function extractTkNumbers(s) {
+      if (s == null) return [];
+      return (String(s).match(/\d{9,}/g) || []);
+    }
+
+    // Trả về số C/O nếu khớp DUY NHẤT 1 số C/O qua số tờ khai; ngược lại null
+    function resolveSoCO(item) {
+      const decl = extractDeclarationNumbers(item.xls_list); // "123, 456" | "---"
+      if (!decl || decl === '---') return null;
+      const nums = decl.split(',').map(s => normDigits(s)).filter(Boolean);
+      const found = new Set();
+      for (const n of nums) {
+        const set = ecosysByToKhai.get(n);
+        if (set) set.forEach(co => found.add(co));
       }
+      return found.size === 1 ? [...found][0] : null;
+    }
 
+    async function triggerSyncAndReload() {
+      const label = document.getElementById('btn-sync-co-label');
+      const t0 = Date.now();
+      try {
+        const { error } = await supabaseClient.from('app_config')
+          .upsert({ key: 'sync_request_at', value: String(t0), updated_at: new Date().toISOString() });
+        if (error) { alert("⚠️ Không gửi được yêu cầu: " + error.message); return; }
+      } catch (e) { alert("⚠️ Lỗi: " + e.message); return; }
+
+      // Hiện dữ liệu hiện có NGAY + báo đang quét nền (không bắt đứng chờ)
+      if (label) label.innerText = "⏳";
       await fetchData();
-      if (syncBtn) syncBtn.innerText = "🔄 Tải lại";
+
+      // Nền: chờ server báo xong rồi tự nạp lại (tối đa 20 phút), KHÔNG chặn nút
+      (async () => {
+        for (let i = 0; i < 240; i++) {
+          await new Promise(r => setTimeout(r, 5000));
+          try {
+            const { data } = await supabaseClient.from('app_config').select('value').eq('key','sync_last_done').maybeSingle();
+            if (data && Number(data.value) > t0) { await fetchData(); break; }
+          } catch (e) {}
+        }
+        if (label) label.innerText = "⚡";
+      })();
     }
 
     function checkHasBill(pdfList, category) {
@@ -456,18 +523,21 @@
       if (!xlsList || !Array.isArray(xlsList)) xlsList = [];
       
       const allFiles = [...pdfList, ...xlsList];
+      const form = getFormByCountry(countryStr);
       let missing = [];
 
       if (!pdfList.some(f => f.toUpperCase().includes('_BK.PDF'))) missing.push('BK');
-      if (!pdfList.some(f => f.toUpperCase().includes('_PLX.PDF'))) missing.push('PLX');
+
+      // PLX: Form D / UAE / B KHÔNG cần tính thiếu
+      if (!['D', 'UAE', 'B'].includes(form)) {
+        if (!pdfList.some(f => f.toUpperCase().includes('_PLX.PDF'))) missing.push('PLX');
+      }
       if (!pdfList.some(f => f.toUpperCase().includes('_TKN+VAT.PDF'))) missing.push('TKN+VAT');
       if (!pdfList.some(f => f.toUpperCase().includes('_QTSX.PDF'))) missing.push('QTSX');
       if (!pdfList.some(f => f.toUpperCase().includes('_PL.PDF'))) missing.push('PL');
 
       const hasNumberPdf = pdfList.some(f => /_\d+\.pdf$/i.test(f));
       if (!hasNumberPdf) missing.push('INV');
-
-      const form = getFormByCountry(countryStr);
 
       if (form === 'EUR1') {
         const hasEur1Draft = allFiles.some(f => f.toLowerCase().includes('_file in.xlsm') || f.toLowerCase().includes('_file in'));
@@ -489,7 +559,8 @@
 
       let numbers = [];
       xlsList.forEach(fileName => {
-        const match = fileName.match(/_(\d+)\.(xls|xlsx|xlsm)$/i) || fileName.match(/(\d{10,12})/);
+        if (!/\.xls$/i.test(fileName)) return;   // CHỈ lấy file .xls (bỏ .xlsx / .xlsm / .docx)
+        const match = fileName.match(/_(\d+)\.xls$/i) || fileName.match(/(\d{10,12})/);
         if (match && match[1]) {
           numbers.push(match[1]);
         }
@@ -497,20 +568,46 @@
 
       return numbers.length > 0 ? numbers.join(', ') : '---';
     }
+        // Lấy TOÀN BỘ dữ liệu, vượt giới hạn 1000 dòng của Supabase (phân trang .range)
+    async function fetchAllRows(buildQuery) {
+      const PAGE = 1000;
+      let from = 0;
+      let all = [];
+      while (true) {
+        const { data, error } = await buildQuery().range(from, from + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all = all.concat(data);
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return all;
+    }
+
+    // Khóa sắp xếp theo Date PL ("DD.MM" + source_year); không có PL -> xuống cuối
+    function plSortKey(item) {
+      const d = (item.pl_date || '').trim();
+      const m = d.match(/^(\d{1,2})\.(\d{1,2})$/);
+      if (!m) return -Infinity;
+      const day = parseInt(m[1], 10);
+      const month = parseInt(m[2], 10);
+      const year = Number(item.source_year) || 0;
+      return year * 10000 + month * 100 + day;
+    }
 
     async function fetchData() {
-      const { data, error } = await supabaseClient
-        .from('ecis_summary')
-        .select('*')
-        .order('category', { ascending: true })
-        .order('folder_name', { ascending: true });
-
-      if (error) {
+      let data;
+      try {
+        data = await fetchAllRows(() => supabaseClient
+          .from('ecis_summary')
+          .select('*')
+          .order('id', { ascending: true }));
+      } catch (error) {
         alert("Lỗi tải dữ liệu: " + error.message);
         return;
       }
 
-      globalData = data || [];
+      globalData = (data || []).sort((a, b) => plSortKey(b) - plSortKey(a)); // Date PL mới nhất lên đầu
       updateKPIs(globalData);
       filterData();
     }
@@ -555,7 +652,9 @@
         }
 
         const matchCat = cat === 'ALL' || item.category === cat;
-        const matchForm = selectedForm === 'ALL' || itemForm === selectedForm;
+        const matchForm = selectedForm === 'ALL'
+          ? true
+          : (selectedForm === 'NONE' ? itemForm === '---' : itemForm === selectedForm);
 
         const hasBill = checkHasBill(item.pdf_list, item.category);
         let matchBill = true;
@@ -595,7 +694,7 @@
       tbody.innerHTML = '';
 
       if (filteredData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="12" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
         renderPagination(0);
         return;
       }
@@ -623,7 +722,7 @@
 
         const hasBill = checkHasBill(item.pdf_list, item.category);
         const billDisplay = hasBill 
-          ? `<span class="inline-block bg-green-500 text-white font-black text-xs px-2.5 py-1 rounded shadow-sm bill-active-anim">BILL</span>`
+          ? `<span class="inline-flex items-center gap-1 bg-green-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">✓ BILL</span>`
           : `<span class="inline-block bg-red-100 text-red-600 border border-red-300 font-bold text-xs px-2.5 py-1 rounded">BILL</span>`;
 
         const plDateDisplay = item.pl_date || '---';
@@ -632,7 +731,14 @@
           ? `<span class="inline-block bg-blue-50 text-blue-700 font-bold text-xs px-2 py-0.5 rounded border border-blue-200">${item.etd}</span>`
           : `<span class="text-gray-400 text-xs">---</span>`;
 
-        const deadlineDisplay = getDeadlineBadge(item.deadline);
+        const soCO = resolveSoCO(item);
+        const soCODisplay = soCO
+          ? `<span class="inline-block bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">${soCO}</span>`
+          : `<span class="text-gray-400 text-xs">---</span>`;
+
+        const deadlineDisplay = soCO
+          ? `<span class="inline-flex items-center gap-1 bg-green-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">✓ DONE</span>`
+          : getDeadlineBadge(item.deadline);
         const countryDisplay = item.country || '---';
 
         const formValue = getFormByCountry(countryDisplay);
@@ -650,6 +756,7 @@
           <td class="py-3 px-4 text-center font-semibold text-slate-700 bg-slate-50/50">${plDateDisplay}</td>
           <td class="py-3 px-4 font-semibold text-indigo-700 uppercase">${countryDisplay}</td>
           <td class="py-3 px-4 text-center">${formDisplay}</td>
+          <td class="py-3 px-4 text-center">${soCODisplay}</td>
           <td class="py-3 px-4 font-medium text-gray-800">${item.folder_name}</td>
           <td class="py-3 px-4 font-mono text-emerald-700 font-medium">${declarationDisplay}</td>
           <td class="py-3 px-4">${missingDisplay}</td>
@@ -669,36 +776,74 @@
 
       renderPagination(startIndex, endIndex);
     }
+    // ===== PHÂN TRANG NÉN (1 2 3 4 5 … N) + màu trạng thái ECOSYS =====
+    function pagerItems(current, total) {
+      if (total <= 7) { const a = []; for (let i = 1; i <= total; i++) a.push(i); return a; }
+      if (current <= 4) return [1, 2, 3, 4, 5, '...', total];
+      if (current >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+      return [1, '...', current - 1, current, current + 1, '...', total];
+    }
+
+    function renderPager(containerId, current, totalPages, fnName) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      if (!totalPages || totalPages <= 1) { el.innerHTML = ''; return; }
+
+      const sq = "w-9 h-9 flex items-center justify-center rounded-lg text-sm transition";
+      let html = '';
+
+      html += `<button onclick="${fnName}(${current - 1})" ${current === 1 ? 'disabled' : ''}
+        class="${sq} ${current === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:bg-slate-100'}">‹</button>`;
+
+      for (const it of pagerItems(current, totalPages)) {
+        if (it === '...') {
+          html += `<span class="${sq} text-slate-400 select-none">…</span>`;
+        } else if (it === current) {
+          html += `<button class="${sq} bg-blue-500 text-white font-bold shadow-sm">${it}</button>`;
+        } else {
+          html += `<button onclick="${fnName}(${it})" class="${sq} border border-slate-200 bg-white text-slate-600 font-semibold hover:bg-slate-50 hover:border-blue-300">${it}</button>`;
+        }
+      }
+
+      html += `<button onclick="${fnName}(${current + 1})" ${current === totalPages ? 'disabled' : ''}
+        class="${sq} ${current === totalPages ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:bg-slate-100'}">›</button>`;
+
+      el.innerHTML = html;
+    }
+
+    // Màu badge trạng thái ECOSYS
+    function ecosysStatusBadge(status) {
+      const s = (status || '').trim();
+      const u = s.toLowerCase();
+      let cls;
+      if (u.includes('nháp')) {
+        cls = 'bg-slate-200 text-slate-600 border-slate-300';            // Lưu nháp - xám
+      } else if (u.includes('gddn') || (u.includes('duyệt') && !u.includes('cấp phép'))) {
+        cls = 'bg-sidebar-main text-white border-sidebar-main';          // GDDN duyệt - xanh sidebar #265E9B
+      } else if (u.includes('chờ cấp')) {
+        cls = 'bg-amber-100 text-amber-800 border-amber-300';            // đang chờ cấp - vàng
+      } else if (u.includes('cấp phép')) {
+        cls = 'bg-green-100 text-green-700 border-green-300';            // đã cấp phép - xanh lá
+      } else {
+        cls = 'bg-slate-100 text-slate-500 border-slate-300';
+      }
+      return `<span class="inline-block border ${cls} font-semibold px-2 py-0.5 rounded">${s || '---'}</span>`;
+    }
 
     function renderPagination(startIndex, endIndex) {
       const totalItems = filteredData.length;
       const totalPages = Math.ceil(totalItems / itemsPerPage);
       const pageInfo = document.getElementById('page-info');
-      const controls = document.getElementById('pagination-controls');
 
       if (totalItems === 0) {
         pageInfo.innerText = 'Hiển thị 0 ECIS';
-        controls.innerHTML = '';
+        const c = document.getElementById('pagination-controls');
+        if (c) c.innerHTML = '';
         return;
       }
 
       pageInfo.innerText = `Hiển thị ${startIndex + 1} - ${endIndex} trong tổng số ${totalItems} ECIS`;
-
-      let buttonsHTML = '';
-
-      buttonsHTML += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} 
-        class="px-2.5 py-1 text-xs rounded border bg-white ${currentPage === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100'}">Trang trước</button>`;
-
-      for (let i = 1; i <= totalPages; i++) {
-        const isActive = i === currentPage;
-        buttonsHTML += `<button onclick="changePage(${i})" 
-          class="px-3 py-1 text-xs rounded border font-semibold ${isActive ? 'bg-slate-800 text-white border-slate-800' : 'bg-white hover:bg-slate-100 text-slate-700'}">${i}</button>`;
-      }
-
-      buttonsHTML += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} 
-        class="px-2.5 py-1 text-xs rounded border bg-white ${currentPage === totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100'}">Trang sau</button>`;
-
-      controls.innerHTML = buttonsHTML;
+      renderPager('pagination-controls', currentPage, totalPages, 'changePage');
     }
 
     function changePage(page) {
@@ -736,42 +881,98 @@
     }
 
 
-    // Tải dữ liệu ban đầu cho CO TRACKING
+    // Tải dữ liệu ban đầu: map ECOSYS (số C/O) + CO TRACKING
+    fetchEcosysData();
     fetchData();
 
     // ---------------- LOGIC TRUY VẤN ECOSYS 11 CỘT ----------------
     async function fetchEcosysData() {
-      const { data, error } = await supabaseClient
-        .from('ecosys_data')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
+      let data;
+      try {
+        data = await fetchAllRows(() => supabaseClient
+          .from('ecosys_data')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true }));
+      } catch (error) {
         console.error("Lỗi lấy dữ liệu ECOSYS:", error.message);
         return;
       }
 
+      ecosysData = data || [];
+
+      // Map số tờ khai -> tập số C/O (TÁCH nhiều số trong 1 ô)
+      ecosysByToKhai = new Map();
+      ecosysData.forEach(r => {
+        const co = (r.so_co || '').trim();
+        if (!co) return;
+        extractTkNumbers(r.so_to_khai).forEach(k => {
+          if (!ecosysByToKhai.has(k)) ecosysByToKhai.set(k, new Set());
+          ecosysByToKhai.get(k).add(co);
+        });
+      });
+      if (filteredData && filteredData.length) renderTable(); // cập nhật cột Số C/O bên CO
+
+      ecosysPage = 1;
+      renderEcosys();
+    }
+
+    function renderEcosys() {
       const tbody = document.getElementById('ecosys-table-body');
-      if (!data || data.length === 0) {
+      if (!ecosysData || ecosysData.length === 0) {
         tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-slate-400 font-medium">Chưa có dữ liệu ECOSYS trong hệ thống.</td></tr>`;
+        renderEcosysPagination();
         return;
       }
 
-      tbody.innerHTML = data.map((item, index) => `
+      const start = (ecosysPage - 1) * ecosysPerPage;
+      const end = Math.min(start + ecosysPerPage, ecosysData.length);
+      const pageData = ecosysData.slice(start, end);
+
+      const cell = "py-3 px-3 align-top whitespace-nowrap";
+      tbody.innerHTML = pageData.map((item, i) => `
         <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-          <td class="py-3 px-3 font-medium text-slate-400">${index + 1}</td>
-          <td class="py-3 px-3 font-semibold text-slate-800">${item.so_tiep_nhan || '---'}</td>
-          <td class="py-3 px-3 font-bold text-blue-600">${item.so_co || '---'}</td>
-          <td class="py-3 px-3"><span class="bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2 py-0.5 rounded">${item.mau_co || '---'}</span></td>
-          <td class="py-3 px-3">${formatDate(item.ngay_cap_so)}</td>
-          <td class="py-3 px-3 font-mono text-emerald-700">${item.so_to_khai || '---'}</td>
-          <td class="py-3 px-3"><span class="bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold px-2 py-0.5 rounded">${item.trang_thai || 'Đã duyệt'}</span></td>
-          <td class="py-3 px-3">${formatDate(item.ngay_khai)}</td>
-          <td class="py-3 px-3">${formatDate(item.ngay_duyet)}</td>
-          <td class="py-3 px-3">${formatDate(item.ngay_cap_phe_duyet)}</td>
-          <td class="py-3 px-3 font-medium text-slate-700">${item.doanh_nghiep_ky || '---'}</td>
+          <td class="${cell} font-medium text-slate-400">${start + i + 1}</td>
+          <td class="${cell} font-semibold text-slate-800">${item.so_tiep_nhan || '---'}</td>
+          <td class="${cell} font-bold text-blue-600">${item.so_co || '---'}</td>
+          <td class="${cell}"><span class="inline-block bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2 py-0.5 rounded">${item.mau_co || '---'}</span></td>
+          <td class="${cell}">${formatDate(item.ngay_cap_so)}</td>
+          <td class="${cell} font-mono text-emerald-700">${item.so_to_khai || '---'}</td>
+          <td class="${cell}">${ecosysStatusBadge(item.trang_thai)}</td>
+          <td class="${cell}">${formatDate(item.ngay_khai)}</td>
+          <td class="${cell}">${formatDate(item.ngay_duyet)}</td>
+          <td class="${cell}">${formatDate(item.ngay_cap_phe_duyet)}</td>
+          <td class="${cell} font-medium text-slate-700">${item.doanh_nghiep_ky || '---'}</td>
         </tr>
       `).join('');
+
+      renderEcosysPagination();
+    }
+
+    function renderEcosysPagination() {
+      const total = ecosysData.length;
+      const totalPages = Math.ceil(total / ecosysPerPage) || 1;
+      const info = document.getElementById('ecosys-page-info');
+      if (!info) return;
+
+      if (total === 0) {
+        info.innerText = 'Hiển thị 0 hồ sơ';
+        const c = document.getElementById('ecosys-pagination');
+        if (c) c.innerHTML = '';
+        return;
+      }
+
+      const start = (ecosysPage - 1) * ecosysPerPage;
+      const end = Math.min(start + ecosysPerPage, total);
+      info.innerText = `Hiển thị ${start + 1} - ${end} trong tổng số ${total} hồ sơ`;
+      renderPager('ecosys-pagination', ecosysPage, totalPages, 'changeEcosysPage');
+    }
+
+    function changeEcosysPage(page) {
+      const totalPages = Math.ceil(ecosysData.length / ecosysPerPage) || 1;
+      if (page < 1 || page > totalPages) return;
+      ecosysPage = page;
+      renderEcosys();
     }
 
     function formatDate(dateStr) {
@@ -795,7 +996,7 @@
 
   // Nền: chờ server báo xong rồi tự nạp lại (tối đa 3 phút), KHÔNG chặn nút
   (async () => {
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 240; i++) {
       await new Promise(r => setTimeout(r, 5000));
       try {
         const { data } = await supabaseClient.from('app_config').select('value').eq('key','scrape_last_done').maybeSingle();
