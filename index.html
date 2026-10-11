@@ -514,7 +514,7 @@
     function checkHasBill(pdfList, category) {
       if (!pdfList || !Array.isArray(pdfList)) return false;
       const isLCL = (category && category.toUpperCase() === 'LCL');
-      const billKey = isLCL ? '_FCR' : '_B';
+      const billKey = isLCL ? '_FCR.PDF' : '_B.PDF';
       return pdfList.some(f => f.toUpperCase().includes(billKey));
     }
 
