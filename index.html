@@ -107,6 +107,14 @@
 
       <!-- Navigation Links -->
       <nav class="p-2 space-y-2 flex-1">
+        <button onclick="switchTab('statistical')" id="btn-tab-stats" class="nav-item">
+          <svg class="nav-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/>
+          </svg>
+          <span class="nav-label">STATISTICAL</span>
+          <span class="nav-short">STATS</span>
+        </button>
+
         <button onclick="switchTab('co-tracking')" id="btn-tab-co" class="nav-item active">
           <svg class="nav-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
@@ -136,6 +144,39 @@
     <!-- ================= 2. KHU VỰC NỘI DUNG CHÍNH (BÊN PHẢI) ================= -->
     <main class="flex-1 p-8 overflow-y-auto">
       
+      <!-- TAB: STATISTICAL -->
+      <div id="section-statistical" class="hidden">
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+
+          <div class="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 border-b pb-3">
+              <h2 class="text-base font-bold text-slate-800 uppercase tracking-wide">CHART OF THE NUMBER OF ISSUED C/O</h2>
+              <div class="flex items-center gap-2">
+                <button id="chart-btn-2025" onclick="setChartYear(2025)" class="px-4 py-1.5 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">2025</button>
+                <button id="chart-btn-2026" onclick="setChartYear(2026)" class="px-4 py-1.5 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">2026</button>
+              </div>
+            </div>
+            <div id="chart-bars" class="flex items-end gap-2 border-b border-slate-200 pb-2" style="min-height:200px;"></div>
+          </div>
+
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between gap-2 mb-4 border-b pb-3">
+              <h2 class="text-base font-bold text-slate-800 uppercase tracking-wide">CHART OF C/O ISSUANCE VOLUME</h2>
+              <div class="flex items-center gap-1.5">
+                <button id="donut-btn-2025" onclick="setChartYear(2025)" class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">2025</button>
+                <button id="donut-btn-2026" onclick="setChartYear(2026)" class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">2026</button>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div id="form-donut" class="shrink-0"></div>
+              <div id="donut-detail" class="flex-1 min-w-0"></div>
+            </div>
+            <div id="form-donut-legend" class="mt-4 grid grid-cols-2 gap-x-3 gap-y-1"></div>
+          </div>
+
+        </div>
+      </div>
+
       <!-- TAB 1: CO TRACKING SEDO 2026 -->
       <div id="section-co-tracking">
         
@@ -260,14 +301,14 @@
               <tr>
                 <th class="py-3 px-4 text-center w-12">No.</th>
                 <th class="py-3 px-4">TYPE</th>
-                <th class="py-3 px-4 text-center">Date PL</th>
+                <th class="py-3 px-4 text-center cursor-pointer select-none hover:bg-slate-100" onclick="setSort('pl')" title="Sắp xếp Date PL">Date PL <span id="sort-pl-arrow">▼</span></th>
                 <th class="py-3 px-4">Country</th>
                 <th class="py-3 px-4 text-center">FORM</th>
                 <th class="py-3 px-4 text-center">Số C/O</th>
                 <th class="py-3 px-4">ECIS</th>
                 <th class="py-3 px-4">Tờ Khai</th>
                 <th class="py-3 px-4">FILE THIẾU</th>
-                <th class="py-3 px-4 text-center">ETD</th>
+                <th class="py-3 px-4 text-center cursor-pointer select-none hover:bg-slate-100" onclick="setSort('etd')" title="Sắp xếp ETD">ETD <span id="sort-etd-arrow">↕</span></th>
                 <th class="py-3 px-4 text-center">DEADLINE</th>
                 <th class="py-3 px-4 text-center">BILL</th>
                 <th class="py-3 px-4 text-center w-12"></th>
@@ -312,7 +353,7 @@
 
           <!-- THỐNG KÊ + TÌM KIẾM ECOSYS -->
           <div class="mb-5 space-y-3">
-            <div class="flex flex-wrap gap-2">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               <div class="px-3 py-2 rounded-lg bg-slate-800 text-white">
                 <div class="text-[10px] uppercase tracking-wide opacity-80">Tổng ECIS đã đọc</div>
                 <div id="ecostat-total" class="text-lg font-bold leading-tight">0</div>
@@ -333,12 +374,16 @@
                 <div class="text-[10px] uppercase tracking-wide">Đang chờ cấp</div>
                 <div id="ecostat-pending" class="text-lg font-bold leading-tight">0</div>
               </div>
+              <div class="px-3 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200">
+                <div class="text-[10px] uppercase tracking-wide">C/O bị từ chối</div>
+                <div id="ecostat-rejected" class="text-lg font-bold leading-tight">0</div>
+              </div>
             </div>
             <div class="flex flex-wrap gap-2">
-              <input id="ecosys-search-co" oninput="applyEcosysFilter()" type="text" placeholder="🔍 Tìm số C/O..."
-                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-300">
-              <input id="ecosys-search-tk" oninput="applyEcosysFilter()" type="text" placeholder="🔍 Tìm số tờ khai..."
-                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-300">
+              <textarea id="ecosys-search-co" oninput="applyEcosysFilter()" rows="2" placeholder="🔍 Tìm số C/O (nhiều dòng)..."
+                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-72 resize-y focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
+              <textarea id="ecosys-search-tk" oninput="applyEcosysFilter()" rows="2" placeholder="🔍 Tìm số tờ khai (nhiều dòng)..."
+                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-72 resize-y focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
             </div>
           </div>
 
@@ -401,7 +446,7 @@
   <!-- ================= 3. SCRIPT XỬ LÝ LOGIC HOÀN CHỈNH ================= -->
   <script>
    // ---------------- CẤU HÌNH SUPABASE CLIENT (CHUẨN LOCAL & NGROK) ----------------
-    const SUPABASE_URL = "https://carrousel-liking-mannish.ngrok-free.dev";
+    const SUPABASE_URL = "http://localhost:8000";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
     
     
@@ -434,23 +479,19 @@
 
     // ---------------- LOGIC CHUYỂN TAB SIDEBAR ----------------
     function switchTab(tab) {
-      const btnCo = document.getElementById('btn-tab-co');
-      const btnEcosys = document.getElementById('btn-tab-ecosys');
-      const sectionCo = document.getElementById('section-co-tracking');
-      const sectionEcosys = document.getElementById('section-ecosys');
-
-      if (tab === 'co-tracking') {
-        sectionCo.classList.remove('hidden');
-        sectionEcosys.classList.add('hidden');
-        btnCo.classList.add('active');
-        btnEcosys.classList.remove('active');
-      } else {
-        sectionCo.classList.add('hidden');
-        sectionEcosys.classList.remove('hidden');
-        btnEcosys.classList.add('active');
-        btnCo.classList.remove('active');
-        fetchEcosysData();
-      }
+      const tabs = {
+        'statistical': { btn: 'btn-tab-stats', sec: 'section-statistical' },
+        'co-tracking': { btn: 'btn-tab-co',    sec: 'section-co-tracking' },
+        'ecosys':      { btn: 'btn-tab-ecosys', sec: 'section-ecosys' },
+      };
+      Object.keys(tabs).forEach(k => {
+        const sec = document.getElementById(tabs[k].sec);
+        const btn = document.getElementById(tabs[k].btn);
+        if (sec) sec.classList.toggle('hidden', k !== tab);
+        if (btn) btn.classList.toggle('active', k === tab);
+      });
+      if (tab === 'ecosys') fetchEcosysData();
+      if (tab === 'statistical') { renderChart(); renderFormDonut(); }
     }
 
     // ---------------- LOGIC CO TRACKING SEDO 2026 ----------------
@@ -518,6 +559,10 @@
     let ecosysData = [];
     let ecosysView = [];
     let ecosysPage = 1;
+
+    let sortField = 'pl';
+    let sortDir = 'desc';
+    let chartYear = new Date().getFullYear();
     const ecosysPerPage = 30;
 
     function normDigits(s) {
@@ -651,6 +696,163 @@
       return all;
     }
 
+    function dateKeyDMY(str) {
+      if (!str) return -Infinity;
+      const m = String(str).trim().match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?$/);
+      if (!m) return -Infinity;
+      const day = parseInt(m[1],10), month = parseInt(m[2],10);
+      const year = m[3] ? parseInt(m[3],10) : 0;
+      return year*10000 + month*100 + day;
+    }
+    function sortKeyFor(item) {
+      if (sortField === 'etd') return dateKeyDMY(item.etd);
+      const d = (item.pl_date || '').trim();
+      const m = d.match(/^(\d{1,2})\.(\d{1,2})$/);
+      if (!m) return -Infinity;
+      return (Number(item.source_year)||0)*10000 + parseInt(m[2],10)*100 + parseInt(m[1],10);
+    }
+    function applySort() {
+      globalData.sort((a,b) => { const ka=sortKeyFor(a),kb=sortKeyFor(b); return sortDir==='desc'?(kb-ka):(ka-kb); });
+    }
+    function updateSortIndicators() {
+      const arrow = d => d==='desc'?'▼':'▲';
+      const p=document.getElementById('sort-pl-arrow'), e=document.getElementById('sort-etd-arrow');
+      if(p) p.textContent = sortField==='pl'?arrow(sortDir):'↕';
+      if(e) e.textContent = sortField==='etd'?arrow(sortDir):'↕';
+    }
+    function setSort(field) {
+      if (sortField===field) sortDir = sortDir==='desc'?'asc':'desc';
+      else { sortField=field; sortDir='desc'; }
+      applySort(); filterData(); updateSortIndicators();
+    }
+    function countIssuedByMonth(year) {
+      const months = new Array(12).fill(0);
+      (ecosysData||[]).forEach(r => {
+        if (!r.ngay_cap_phe_duyet) return;
+        const d = new Date(r.ngay_cap_phe_duyet);
+        if (!isNaN(d.getTime()) && d.getFullYear()===year) months[d.getMonth()]++;
+      });
+      return months;
+    }
+    function setChartYear(y){ chartYear=y; renderChart(); renderFormDonut(); }
+
+    const FORM_COLORS = {
+      'EUR1': '#16a34a', 'D': '#2563eb', 'B': '#f59e0b', 'UAE': '#7c3aed',
+      'AI': '#14b8a6', 'VJ': '#db2777', 'CPTPP': '#06b6d4', 'E': '#84cc16',
+      'NO': '#64748b', '---': '#94a3b8'
+    };
+    const FORM_FALLBACK = ['#4f46e5','#0ea5e9','#a855f7','#059669','#d97706','#0d9488','#2563eb','#7c3aed'];
+    let _formColorIdx = 0; const _formColorCache = {};
+    function formColor(form){
+      if (FORM_COLORS[form]) return FORM_COLORS[form];
+      if (!_formColorCache[form]) { _formColorCache[form] = FORM_FALLBACK[_formColorIdx % FORM_FALLBACK.length]; _formColorIdx++; }
+      return _formColorCache[form];
+    }
+    let donutEntries = [], donutTotal = 0;
+
+    function renderFormDonut() {
+      [2025,2026].forEach(y => {
+        const b = document.getElementById('donut-btn-'+y); if (!b) return;
+        if (y===chartYear){ b.className='px-3 py-1 rounded-lg text-xs font-bold text-white shadow'; b.style.backgroundColor='#265E9B'; }
+        else { b.className='px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200'; b.style.backgroundColor=''; }
+      });
+
+      const svgWrap = document.getElementById('form-donut');
+      const legend = document.getElementById('form-donut-legend');
+      if (!svgWrap || !legend) return;
+
+      const counts = {};
+      (globalData || []).forEach(it => {
+        if ((Number(it.source_year)||0) !== chartYear) return;
+        const f = getFormByCountry(it.country) || '---';
+        counts[f] = (counts[f] || 0) + 1;
+      });
+      const ent = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+      donutTotal = ent.reduce((s,[,v])=>s+v, 0);
+      donutEntries = ent.map(([form,v])=>[form, v, formColor(form)]);
+
+      const detail = document.getElementById('donut-detail');
+      if (donutTotal === 0) {
+        svgWrap.innerHTML = '<div class="text-sm text-slate-400 py-12 px-4 text-center">Chưa có dữ liệu năm '+chartYear+'</div>';
+        legend.innerHTML = ''; if (detail) detail.innerHTML = '';
+        return;
+      }
+
+      const R = 60, CX = 80, CY = 80, SW = 24, C = 2*Math.PI*R;
+      let acc = 0;
+      const segs = donutEntries.map(([form,v,color],i) => {
+        const seg = (v/donutTotal)*C;
+        const el = `<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${color}" stroke-width="${SW}" data-sw="${SW}" stroke-dasharray="${seg} ${C-seg}" stroke-dashoffset="${-acc}" transform="rotate(-90 ${CX} ${CY})" style="cursor:pointer;transition:stroke-width .15s ease,opacity .15s ease;" onmouseover="donutHover(${i})" onmouseout="donutHover(-1)"></circle>`;
+        acc += seg; return el;
+      }).join('');
+
+      svgWrap.innerHTML = `<svg width="160" height="160" viewBox="0 0 160 160">${segs}<text id="donut-center-num" x="${CX}" y="${CY-2}" text-anchor="middle" style="fill:#1e293b;font-size:24px;font-weight:700;">${donutTotal}</text><text id="donut-center-label" x="${CX}" y="${CY+16}" text-anchor="middle" style="fill:#94a3b8;font-size:10px;">C/O</text></svg>`;
+
+      legend.innerHTML = donutEntries.map(([form,v,color],i) => {
+        const pct = ((v/donutTotal)*100).toFixed(0);
+        const name = (form==='---') ? 'Chưa có Form' : form;
+        return `<div class="flex items-center justify-between text-xs cursor-pointer" onmouseover="donutHover(${i})" onmouseout="donutHover(-1)"><span class="flex items-center gap-1.5 truncate"><span class="inline-block w-3 h-3 rounded-sm shrink-0" style="background:${color}"></span>${name}</span><span class="font-semibold text-slate-700 shrink-0">${v} (${pct}%)</span></div>`;
+      }).join('');
+
+      donutHover(-1);
+    }
+
+    function donutHover(i) {
+      const circles = document.querySelectorAll('#form-donut circle');
+      const numEl = document.getElementById('donut-center-num');
+      const labEl = document.getElementById('donut-center-label');
+      const detail = document.getElementById('donut-detail');
+      if (i < 0 || !donutEntries[i]) {
+        circles.forEach(c => { c.setAttribute('stroke-width', c.getAttribute('data-sw')); c.style.opacity = '1'; });
+        if (numEl) numEl.textContent = donutTotal;
+        if (labEl) labEl.textContent = 'C/O';
+        if (detail) detail.innerHTML = '';
+        return;
+      }
+      const [form, v, color] = donutEntries[i];
+      const pct = donutTotal ? ((v/donutTotal)*100).toFixed(1) : '0';
+      circles.forEach((c,k) => { const base=c.getAttribute('data-sw'); c.setAttribute('stroke-width', k===i?(Number(base)+9):base); c.style.opacity = k===i?'1':'0.4'; });
+      if (numEl) numEl.textContent = v;
+      if (labEl) labEl.textContent = (form==='---' ? 'No Form' : form);
+      if (detail) detail.innerHTML = `<div class="flex items-center gap-2 mb-1"><span class="inline-block w-4 h-4 rounded" style="background:${color}"></span><span class="font-bold text-slate-800">${form==='---'?'Chưa có Form':form}</span></div><div class="text-3xl font-extrabold text-slate-800 leading-none">${v}</div><div class="text-sm text-slate-500 mt-0.5">${pct}% tổng số</div>`;
+    }
+    function renderChart() {
+      const yl=document.getElementById('chart-year-label'); if(yl) yl.innerText=chartYear;
+      [2025,2026].forEach(y => {
+        const b=document.getElementById('chart-btn-'+y); if(!b) return;
+        if(y===chartYear){ b.className='px-4 py-1.5 rounded-lg text-sm font-bold text-white shadow'; b.style.backgroundColor='#265E9B'; }
+        else { b.className='px-4 py-1.5 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200'; b.style.backgroundColor=''; }
+      });
+      const wrap=document.getElementById('chart-bars'); if(!wrap) return;
+
+      const now=new Date(), curY=now.getFullYear(), curM=now.getMonth()+1;
+      let n=12; if(chartYear>curY) n=0; else if(chartYear===curY) n=curM;
+      if(n===0){ wrap.innerHTML='<div class="text-sm text-slate-400 py-12 text-center w-full">Chưa tới năm '+chartYear+'</div>'; return; }
+
+      const monthly=countIssuedByMonth(chartYear).slice(0,n);
+      const cum=[]; monthly.reduce((a,v,i)=>{ const t=a+v; cum[i]=t; return t; },0);
+      const maxM=Math.max(1,...monthly), maxC=Math.max(1,cum[cum.length-1]||1);
+      const names=['01','02','03','04','05','06','07','08','09','10','11','12'];
+
+      const slot=56,padL=14,padR=14,padT=26,padB=26,H=240;
+      const W=padL+padR+n*slot, Hp=H-padT-padB, bw=slot*0.5;
+      let bars='', pts=[];
+      monthly.forEach((v,i)=>{
+        const x=padL+i*slot+(slot-bw)/2, h=Math.round((v/maxM)*Hp), y=padT+(Hp-h);
+        bars+=`<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" fill="#265E9B"></rect>`
+            + `<text x="${x+bw/2}" y="${y-5}" text-anchor="middle" style="fill:#334155;font-size:11px;font-weight:700;">${v}</text>`
+            + `<text x="${x+bw/2}" y="${H-8}" text-anchor="middle" style="fill:#94a3b8;font-size:11px;">${names[i]}</text>`;
+        const cx=padL+i*slot+slot/2, cy=padT+(Hp-Math.round((cum[i]/maxC)*Hp));
+        pts.push([cx,cy,cum[i]]);
+      });
+      const line=pts.map((p,i)=>(i===0?'M':'L')+p[0]+' '+p[1]).join(' ');
+      const dots=pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.5"></circle>`).join('');
+      const lp=pts[pts.length-1];
+      const clab = lp ? `<text x="${lp[0]}" y="${lp[1]-9}" text-anchor="end" style="fill:#b45309;font-size:12px;font-weight:700;">${lp[2]}</text>` : '';
+
+      wrap.innerHTML=`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}<path d="${line}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></path>${dots}${clab}</svg>`;
+    }
+
     // Khóa sắp xếp theo Date PL ("DD.MM" + source_year); không có PL -> xuống cuối
     function plSortKey(item) {
       const d = (item.pl_date || '').trim();
@@ -674,10 +876,12 @@
         return;
       }
 
-      globalData = (data || []).sort((a, b) => plSortKey(b) - plSortKey(a)); // Date PL mới nhất lên đầu
+      globalData = data || [];
+      applySort();
       updateKPIs(globalData);
       filterData();
       updateLastSync();
+      renderFormDonut();
     }
 
     // Định dạng mốc thời gian đồng bộ: "HH:MM-DD/MM/YYYY"
@@ -902,7 +1106,9 @@
       const s = (status || '').trim();
       const u = s.toLowerCase();
       let cls;
-      if (u.includes('nháp')) {
+      if (u.includes('từ chối')) {
+        cls = 'bg-red-100 text-red-700 border-red-300';
+      } else if (u.includes('nháp')) {
         cls = 'bg-slate-200 text-slate-600 border-slate-300';            // Lưu nháp - xám
       } else if (u.includes('gddn') || (u.includes('duyệt') && !u.includes('cấp phép'))) {
         cls = 'bg-sidebar-main text-white border-sidebar-main';          // GDDN duyệt - xanh sidebar #265E9B
@@ -974,6 +1180,7 @@
     // ---------------- LOGIC TRUY VẤN ECOSYS 11 CỘT ----------------
     function countEcosysStatus(status) {
       const u = (status || '').toLowerCase();
+      if (u.includes('từ chối')) return 'rejected';
       if (u.includes('nháp')) return 'draft';
       if (u.includes('gddn') || (u.includes('duyệt') && !u.includes('cấp phép'))) return 'gddn';
       if (u.includes('chờ cấp')) return 'pending';
@@ -982,7 +1189,7 @@
     }
 
     function updateEcosysStats() {
-      const c = { draft: 0, approved: 0, gddn: 0, pending: 0 };
+      const c = { draft: 0, approved: 0, gddn: 0, pending: 0, rejected: 0 };
       (ecosysData || []).forEach(r => { const k = countEcosysStatus(r.trang_thai); if (c[k] !== undefined) c[k]++; });
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
       set('ecostat-total', (ecosysData || []).length);
@@ -990,16 +1197,19 @@
       set('ecostat-approved', c.approved);
       set('ecostat-gddn', c.gddn);
       set('ecostat-pending', c.pending);
+      set('ecostat-rejected', c.rejected);
     }
 
     function applyEcosysFilter() {
       const coEl = document.getElementById('ecosys-search-co');
       const tkEl = document.getElementById('ecosys-search-tk');
-      const coKey = (coEl ? coEl.value : '').trim().toLowerCase();
-      const tkKey = (tkEl ? tkEl.value : '').replace(/\D/g, '');
+      const coTerms = (coEl ? coEl.value : '').split(/[\n,\s]+/).map(t => t.trim().toLowerCase()).filter(Boolean);
+      const tkTerms = (tkEl ? tkEl.value : '').split(/[\n,\s]+/).map(t => t.replace(/\D/g, '')).filter(Boolean);
       ecosysView = (ecosysData || []).filter(r => {
-        const okCo = !coKey || (r.so_co || '').toLowerCase().includes(coKey);
-        const okTk = !tkKey || (r.so_to_khai || '').replace(/\D/g, '').includes(tkKey);
+        const co = (r.so_co || '').toLowerCase();
+        const tk = (r.so_to_khai || '').replace(/\D/g, '');
+        const okCo = coTerms.length === 0 || coTerms.some(t => co.includes(t));
+        const okTk = tkTerms.length === 0 || tkTerms.some(t => tk.includes(t));
         return okCo && okTk;
       });
       ecosysPage = 1;
@@ -1035,6 +1245,7 @@
 
       updateEcosysStats();
       applyEcosysFilter();
+      renderChart();
     }
 
     function renderEcosys() {
