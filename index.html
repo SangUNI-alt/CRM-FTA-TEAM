@@ -132,13 +132,20 @@
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              <span class="w-2 h-2 mr-2 bg-green-500 rounded-full animate-ping"></span> Realtime Active
+            <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+              Last updated:&nbsp;<span id="last-sync-time" class="font-semibold text-slate-800">—</span>
             </span>
             <button onclick="triggerSyncAndReload()" id="btn-sync-co"
               class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-white w-11 h-11 rounded-lg transition shadow-sm flex items-center justify-center"
               title="Tải lại dữ liệu CO (30 ngày gần nhất)">
-              <span id="btn-sync-co-label" class="text-2xl leading-none">⚡</span>
+              <span id="btn-sync-co-label" class="inline-flex">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                  <path d="M3 3v5h5"/>
+                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                  <path d="M21 21v-5h-5"/>
+                </svg>
+              </span>
             </button>
           </div>
         </div>
@@ -277,11 +284,13 @@
 
             <button onclick="triggerEcosysBotImmediately()" id="btn-sync-ecosys" 
               class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition shadow-sm">
-              <svg class="w-4 h-4 animate-spin hidden" id="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"></circle>
-                <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" class="opacity-75"></path>
+              <svg id="ecosys-reload-icon" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                <path d="M21 21v-5h-5"/>
               </svg>
-              <span id="btn-ecosys-label">⚡ Loading Data</span>
+              <span id="btn-ecosys-label">Loading Data</span>
             </button>
           </div>
 
@@ -344,7 +353,7 @@
   <!-- ================= 3. SCRIPT XỬ LÝ LOGIC HOÀN CHỈNH ================= -->
   <script>
    // ---------------- CẤU HÌNH SUPABASE CLIENT (CHUẨN LOCAL & NGROK) ----------------
-    const SUPABASE_URL = "https://carrousel-liking-mannish.ngrok-free.dev";
+    const SUPABASE_URL = "http://localhost:8000";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
     
     
@@ -495,7 +504,7 @@
       } catch (e) { alert("⚠️ Lỗi: " + e.message); return; }
 
       // Hiện dữ liệu hiện có NGAY + báo đang quét nền (không bắt đứng chờ)
-      if (label) label.innerText = "⏳";
+      if (label) label.classList.add('animate-spin');
       await fetchData();
 
       // Nền: chờ server báo xong rồi tự nạp lại (tối đa 20 phút), KHÔNG chặn nút
@@ -507,7 +516,7 @@
             if (data && Number(data.value) > t0) { await fetchData(); break; }
           } catch (e) {}
         }
-        if (label) label.innerText = "⚡";
+        if (label) label.classList.remove('animate-spin');
       })();
     }
 
@@ -516,6 +525,14 @@
       const isLCL = (category && category.toUpperCase() === 'LCL');
       const billKey = isLCL ? '_FCR.PDF' : '_B.PDF';
       return pdfList.some(f => f.toUpperCase().includes(billKey));
+    }
+    // Có file PDF đúng loại không — chấp nhận hậu tố trùng tên " (1)", " (2)"
+    // (vd _PL.pdf, _PL (1).pdf, _PL.pdf (2) đều tính là CÓ; _PLX, _BK không ăn nhầm _PL/_B)
+    function hasPdfType(pdfList, key) {
+      if (!pdfList || !Array.isArray(pdfList)) return false;
+      const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(esc + '(\\s*\\(\\d+\\))?\\.PDF(\\s*\\(\\d+\\))?$', 'i');
+      return pdfList.some(f => re.test(f));
     }
 
     function getMissingPdfTypes(pdfList, category, countryStr, xlsList) {
@@ -526,17 +543,18 @@
       const form = getFormByCountry(countryStr);
       let missing = [];
 
-      if (!pdfList.some(f => f.toUpperCase().includes('_BK.PDF'))) missing.push('BK');
+      if (!hasPdfType(pdfList, '_BK')) missing.push('BK');
 
       // PLX: Form D / UAE / B KHÔNG cần tính thiếu
       if (!['D', 'UAE', 'B'].includes(form)) {
-        if (!pdfList.some(f => f.toUpperCase().includes('_PLX.PDF'))) missing.push('PLX');
+        if (!hasPdfType(pdfList, '_PLX')) missing.push('PLX');
       }
-      if (!pdfList.some(f => f.toUpperCase().includes('_TKN+VAT.PDF'))) missing.push('TKN+VAT');
-      if (!pdfList.some(f => f.toUpperCase().includes('_QTSX.PDF'))) missing.push('QTSX');
-      if (!pdfList.some(f => f.toUpperCase().includes('_PL.PDF'))) missing.push('PL');
+      if (!hasPdfType(pdfList, '_TKN+VAT')) missing.push('TKN+VAT');
+      if (!hasPdfType(pdfList, '_QTSX')) missing.push('QTSX');
+      if (!hasPdfType(pdfList, '_PL')) missing.push('PL');
 
-      const hasNumberPdf = pdfList.some(f => /_\d+\.pdf$/i.test(f));
+      // INV = file PDF đặt tên bằng số (vd _123456.pdf), chấp nhận hậu tố "(1)"
+      const hasNumberPdf = pdfList.some(f => /_\d+(\s*\(\d+\))?\.pdf(\s*\(\d+\))?$/i.test(f));
       if (!hasNumberPdf) missing.push('INV');
 
       if (form === 'EUR1') {
@@ -610,6 +628,25 @@
       globalData = (data || []).sort((a, b) => plSortKey(b) - plSortKey(a)); // Date PL mới nhất lên đầu
       updateKPIs(globalData);
       filterData();
+      updateLastSync();
+    }
+
+    // Định dạng mốc thời gian đồng bộ: "HH:MM-DD/MM/YYYY"
+    function fmtSyncTime(ms) {
+      const d = new Date(Number(ms));
+      if (isNaN(d.getTime())) return '—';
+      const p = n => String(n).padStart(2, '0');
+      return `${p(d.getHours())}:${p(d.getMinutes())}-${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+    }
+
+    // Lấy thời điểm quét CO xong gần nhất (sync_last_done) hiển thị lên badge
+    async function updateLastSync() {
+      const el = document.getElementById('last-sync-time');
+      if (!el) return;
+      try {
+        const { data } = await supabaseClient.from('app_config').select('value').eq('key', 'sync_last_done').maybeSingle();
+        el.innerText = (data && data.value) ? fmtSyncTime(data.value) : '—';
+      } catch (e) { el.innerText = '—'; }
     }
 
     function updateKPIs(data) {
@@ -709,7 +746,7 @@
         
         let missingDisplay = '';
         if (missingList.length === 0) {
-          missingDisplay = `<span class="bg-green-100 text-green-700 font-bold px-2.5 py-1 rounded text-xs">Full</span>`;
+          missingDisplay = `<span class="inline-flex items-center justify-center bg-green-600 text-white font-bold text-sm px-2 py-0.5 rounded shadow-sm" title="Đủ hồ sơ">✓</span>`;
         } else {
           missingDisplay = missingList.map(tag => {
             const isDraftTag = (tag === 'DRAFT');
@@ -991,7 +1028,9 @@
   } catch (e) { alert("⚠️ Lỗi: " + e.message); return; }
 
   // Hiện dữ liệu hiện có NGAY + báo đang cào nền (không bắt đứng chờ)
-  label.innerText = "⏳ Đang cào nền...";
+  const icon = document.getElementById('ecosys-reload-icon');
+  if (icon) icon.classList.add('animate-spin');
+  label.innerText = "Đang cào nền...";
   await fetchEcosysData();
 
   // Nền: chờ server báo xong rồi tự nạp lại (tối đa 3 phút), KHÔNG chặn nút
@@ -1003,7 +1042,8 @@
         if (data && Number(data.value) > t0) { await fetchEcosysData(); break; }
       } catch (e) {}
     }
-    label.innerText = "⚡ Loading Data";
+    if (icon) icon.classList.remove('animate-spin');
+    label.innerText = "Loading Data";
   })();
 }
   </script>
