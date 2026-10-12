@@ -50,7 +50,15 @@
     }
 
     /* ===== Sidebar dạng rail (thu gọn) + mở rộng ===== */
-    #main-sidebar { width: 88px; transition: width 0.3s ease; }
+    #main-sidebar {
+      width: 88px;
+      transition: width 0.3s ease;
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      height: 100vh;
+      overflow-y: auto;
+    }
     #main-sidebar.expanded { width: 176px; }
 
     #main-sidebar .side-full { display: none; }
@@ -100,13 +108,21 @@
       <!-- Navigation Links -->
       <nav class="p-2 space-y-2 flex-1">
         <button onclick="switchTab('co-tracking')" id="btn-tab-co" class="nav-item active">
-          <span class="nav-icon">📦</span>
+          <svg class="nav-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <path d="M9 12h6"/><path d="M9 16h6"/>
+          </svg>
           <span class="nav-label">CO TRACKING 2026</span>
           <span class="nav-short">TRACKING</span>
         </button>
 
         <button onclick="switchTab('ecosys')" id="btn-tab-ecosys" class="nav-item">
-          <span class="nav-icon">🌐</span>
+          <svg class="nav-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+            <path d="M2 12h20"/>
+          </svg>
           <span class="nav-label">ECOSYS MOIT</span>
           <span class="nav-short">ECOSYS</span>
         </button>
@@ -294,6 +310,38 @@
             </button>
           </div>
 
+          <!-- THỐNG KÊ + TÌM KIẾM ECOSYS -->
+          <div class="mb-5 space-y-3">
+            <div class="flex flex-wrap gap-2">
+              <div class="px-3 py-2 rounded-lg bg-slate-800 text-white">
+                <div class="text-[10px] uppercase tracking-wide opacity-80">Tổng ECIS đã đọc</div>
+                <div id="ecostat-total" class="text-lg font-bold leading-tight">0</div>
+              </div>
+              <div class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+                <div class="text-[10px] uppercase tracking-wide">Lưu nháp</div>
+                <div id="ecostat-draft" class="text-lg font-bold leading-tight">0</div>
+              </div>
+              <div class="px-3 py-2 rounded-lg bg-green-50 text-green-700 border border-green-200">
+                <div class="text-[10px] uppercase tracking-wide">Đã cấp phép</div>
+                <div id="ecostat-approved" class="text-lg font-bold leading-tight">0</div>
+              </div>
+              <div class="px-3 py-2 rounded-lg text-white" style="background-color:#265E9B;">
+                <div class="text-[10px] uppercase tracking-wide opacity-90">GDDN duyệt</div>
+                <div id="ecostat-gddn" class="text-lg font-bold leading-tight">0</div>
+              </div>
+              <div class="px-3 py-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
+                <div class="text-[10px] uppercase tracking-wide">Đang chờ cấp</div>
+                <div id="ecostat-pending" class="text-lg font-bold leading-tight">0</div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <input id="ecosys-search-co" oninput="applyEcosysFilter()" type="text" placeholder="🔍 Tìm số C/O..."
+                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-300">
+              <input id="ecosys-search-tk" oninput="applyEcosysFilter()" type="text" placeholder="🔍 Tìm số tờ khai..."
+                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-300">
+            </div>
+          </div>
+
           <!-- BẢNG HIỂN THỊ 11 CỘT chuẩn ECOSYS -->
           <div class="overflow-x-auto">
             <table class="w-full min-w-[1200px] text-left border-collapse text-xs">
@@ -353,7 +401,7 @@
   <!-- ================= 3. SCRIPT XỬ LÝ LOGIC HOÀN CHỈNH ================= -->
   <script>
    // ---------------- CẤU HÌNH SUPABASE CLIENT (CHUẨN LOCAL & NGROK) ----------------
-    const SUPABASE_URL = "http://localhost:8000";
+    const SUPABASE_URL = "https://carrousel-liking-mannish.ngrok-free.dev";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
     
     
@@ -468,6 +516,7 @@
 
     // Dữ liệu + phân trang cho tab ECOSYS MOIT
     let ecosysData = [];
+    let ecosysView = [];
     let ecosysPage = 1;
     const ecosysPerPage = 30;
 
@@ -531,7 +580,7 @@
     function hasPdfType(pdfList, key) {
       if (!pdfList || !Array.isArray(pdfList)) return false;
       const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = new RegExp(esc + '(\\s*\\(\\d+\\))?\\.PDF(\\s*\\(\\d+\\))?$', 'i');
+      const re = new RegExp(esc + '(?:[ _\\-]*\\d+|\\s*\\(\\d+\\))*\\.PDF(?:\\s*\\(\\d+\\))?$', 'i');
       return pdfList.some(f => re.test(f));
     }
 
@@ -923,6 +972,40 @@
     fetchData();
 
     // ---------------- LOGIC TRUY VẤN ECOSYS 11 CỘT ----------------
+    function countEcosysStatus(status) {
+      const u = (status || '').toLowerCase();
+      if (u.includes('nháp')) return 'draft';
+      if (u.includes('gddn') || (u.includes('duyệt') && !u.includes('cấp phép'))) return 'gddn';
+      if (u.includes('chờ cấp')) return 'pending';
+      if (u.includes('cấp phép')) return 'approved';
+      return 'other';
+    }
+
+    function updateEcosysStats() {
+      const c = { draft: 0, approved: 0, gddn: 0, pending: 0 };
+      (ecosysData || []).forEach(r => { const k = countEcosysStatus(r.trang_thai); if (c[k] !== undefined) c[k]++; });
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+      set('ecostat-total', (ecosysData || []).length);
+      set('ecostat-draft', c.draft);
+      set('ecostat-approved', c.approved);
+      set('ecostat-gddn', c.gddn);
+      set('ecostat-pending', c.pending);
+    }
+
+    function applyEcosysFilter() {
+      const coEl = document.getElementById('ecosys-search-co');
+      const tkEl = document.getElementById('ecosys-search-tk');
+      const coKey = (coEl ? coEl.value : '').trim().toLowerCase();
+      const tkKey = (tkEl ? tkEl.value : '').replace(/\D/g, '');
+      ecosysView = (ecosysData || []).filter(r => {
+        const okCo = !coKey || (r.so_co || '').toLowerCase().includes(coKey);
+        const okTk = !tkKey || (r.so_to_khai || '').replace(/\D/g, '').includes(tkKey);
+        return okCo && okTk;
+      });
+      ecosysPage = 1;
+      renderEcosys();
+    }
+
     async function fetchEcosysData() {
       let data;
       try {
@@ -950,21 +1033,22 @@
       });
       if (filteredData && filteredData.length) renderTable(); // cập nhật cột Số C/O bên CO
 
-      ecosysPage = 1;
-      renderEcosys();
+      updateEcosysStats();
+      applyEcosysFilter();
     }
 
     function renderEcosys() {
       const tbody = document.getElementById('ecosys-table-body');
-      if (!ecosysData || ecosysData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-slate-400 font-medium">Chưa có dữ liệu ECOSYS trong hệ thống.</td></tr>`;
+      if (!ecosysView || ecosysView.length === 0) {
+        const msg = (ecosysData && ecosysData.length) ? 'Không có hồ sơ khớp tìm kiếm.' : 'Chưa có dữ liệu ECOSYS trong hệ thống.';
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-slate-400 font-medium">${msg}</td></tr>`;
         renderEcosysPagination();
         return;
       }
 
       const start = (ecosysPage - 1) * ecosysPerPage;
-      const end = Math.min(start + ecosysPerPage, ecosysData.length);
-      const pageData = ecosysData.slice(start, end);
+      const end = Math.min(start + ecosysPerPage, ecosysView.length);
+      const pageData = ecosysView.slice(start, end);
 
       const cell = "py-3 px-3 align-top whitespace-nowrap";
       tbody.innerHTML = pageData.map((item, i) => `
@@ -987,7 +1071,7 @@
     }
 
     function renderEcosysPagination() {
-      const total = ecosysData.length;
+      const total = (ecosysView || []).length;
       const totalPages = Math.ceil(total / ecosysPerPage) || 1;
       const info = document.getElementById('ecosys-page-info');
       if (!info) return;
@@ -1006,7 +1090,7 @@
     }
 
     function changeEcosysPage(page) {
-      const totalPages = Math.ceil(ecosysData.length / ecosysPerPage) || 1;
+      const totalPages = Math.ceil((ecosysView || []).length / ecosysPerPage) || 1;
       if (page < 1 || page > totalPages) return;
       ecosysPage = page;
       renderEcosys();
