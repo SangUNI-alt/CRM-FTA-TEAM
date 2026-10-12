@@ -146,6 +146,13 @@
       
       <!-- TAB: STATISTICAL -->
       <div id="section-statistical" class="hidden">
+
+        <!-- TIÊU ĐỀ — sửa chữ trong h1 (và p) bên dưới theo ý bạn -->
+        <div class="mb-6 border-b border-slate-200 pb-4">
+          <h1 class="text-2xl font-bold text-slate-800 uppercase tracking-wide">TIÊU ĐỀ Ở ĐÂY</h1>
+          <p class="text-sm text-slate-500 mt-1">Mô tả ngắn ở đây (có thể xoá dòng này).</p>
+        </div>
+
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
 
           <div class="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
@@ -241,7 +248,7 @@
 
               <select id="form-filter" onchange="filterData()" class="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-amber-50/50 font-medium">
                 <option value="ALL">Tất cả FORM</option>
-                <option value="EUR1">Form EUR1</option>
+                <option value="EUR.1">Form EUR.1</option>
                 <option value="CPTPP">Form CPTPP</option>
                 <option value="D">Form D</option>
                 <option value="E">Form E</option>
@@ -496,26 +503,26 @@
 
     // ---------------- LOGIC CO TRACKING SEDO 2026 ----------------
     const COUNTRY_FORM_MAP = {
-      'GB': 'EUR1', 'UNITED KINGDOM': 'EUR1', 'UK': 'EUR1',
-      'NL': 'NETHERLANDS', 'NETHERLANDS': 'EUR1',
+      'GB': 'EUR.1', 'UNITED KINGDOM': 'EUR.1', 'UK': 'EUR.1',
+      'NL': 'NETHERLANDS', 'NETHERLANDS': 'EUR.1',
       'MY': 'D',    'MALAYSIA': 'D',
-      'FR': 'EUR1', 'FRANCE': 'EUR1',
-      'SE': 'EUR1', 'SWEDEN': 'EUR1',
+      'FR': 'EUR.1', 'FRANCE': 'EUR.1',
+      'SE': 'EUR.1', 'SWEDEN': 'EUR.1',
       'AE': 'UAE',  'UNITED ARAB EMIRATES': 'UAE', 'UAE': 'UAE',
       'US': 'NO',   'UNITED STATES OF AMERICA': 'NO', 'USA': 'NO', 'UNITED STATES': 'NO',
-      'DE': 'EUR1', 'GERMANY': 'EUR1',
+      'DE': 'EUR.1', 'GERMANY': 'EUR.1',
       'CN': 'E',    'CHINA': 'E',
       'TR': 'B',    'TURKEY': 'B', 'TURKIYE': 'B', 'TRKIYE': 'B',
-      'PL': 'EUR1', 'POLAND': 'EUR1',
-      'ES': 'EUR1', 'SPAIN': 'EUR1',
-      'IT': 'EUR1', 'ITALY': 'EUR1',
-      'RO': 'EUR1', 'ROMANIA': 'EUR1',
+      'PL': 'EUR.1', 'POLAND': 'EUR.1',
+      'ES': 'EUR.1', 'SPAIN': 'EUR.1',
+      'IT': 'EUR.1', 'ITALY': 'EUR.1',
+      'RO': 'EUR.1', 'ROMANIA': 'EUR.1',
       'AU': 'CPTPP', 'AUSTRALIA': 'CPTPP',
       'IN': 'AI',   'INDIA': 'AI',
       'CA': 'CPTPP', 'CANADA': 'CPTPP',
       'JP': 'VJ',   'JAPAN': 'VJ',
-      'AT': 'EUR1', 'AUSTRIA': 'EUR1',
-      'GR': 'EUR1', 'GREECE': 'EUR1',
+      'AT': 'EUR.1', 'AUSTRIA': 'EUR.1',
+      'GR': 'EUR.1', 'GREECE': 'EUR.1',
       'IL': 'NO',   'ISRAEL': 'NO'
     };
 
@@ -762,9 +769,10 @@
       if (!svgWrap || !legend) return;
 
       const counts = {};
-      (globalData || []).forEach(it => {
-        if ((Number(it.source_year)||0) !== chartYear) return;
-        const f = getFormByCountry(it.country) || '---';
+      (ecosysData || []).forEach(it => {
+        const d = it.ngay_cap_phe_duyet ? new Date(it.ngay_cap_phe_duyet) : null;
+        if (!d || isNaN(d.getTime()) || d.getFullYear() !== chartYear) return;
+        const f = (it.mau_co || '').replace(/^Mẫu\s+/i, '').toUpperCase() || '---';
         counts[f] = (counts[f] || 0) + 1;
       });
       const ent = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
@@ -1222,7 +1230,7 @@
         data = await fetchAllRows(() => supabaseClient
           .from('ecosys_data')
           .select('*')
-          .order('created_at', { ascending: false })
+          .order('ngay_khai', { ascending: false, nullsFirst: false })
           .order('id', { ascending: true }));
       } catch (error) {
         console.error("Lỗi lấy dữ liệu ECOSYS:", error.message);
@@ -1246,6 +1254,7 @@
       updateEcosysStats();
       applyEcosysFilter();
       renderChart();
+      renderFormDonut();
     }
 
     function renderEcosys() {
@@ -1267,7 +1276,7 @@
           <td class="${cell} font-medium text-slate-400">${start + i + 1}</td>
           <td class="${cell} font-semibold text-slate-800">${item.so_tiep_nhan || '---'}</td>
           <td class="${cell} font-bold text-blue-600">${item.so_co || '---'}</td>
-          <td class="${cell}"><span class="inline-block bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2 py-0.5 rounded">${item.mau_co || '---'}</span></td>
+          <td class="${cell}"><span class="inline-block bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2 py-0.5 rounded">${(item.mau_co || '').replace(/^Mẫu\s+/i, '').toUpperCase() || '---'}</span></td>
           <td class="${cell}">${formatDate(item.ngay_cap_so)}</td>
           <td class="${cell} font-mono text-emerald-700">${item.so_to_khai || '---'}</td>
           <td class="${cell}">${ecosysStatusBadge(item.trang_thai)}</td>
