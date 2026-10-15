@@ -35,8 +35,24 @@
     .donut-anim {
       animation: donutSweep 1.8s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
     }
-    .bar-gradient { fill: url(#barGrad); filter: drop-shadow(0px 4px 3px rgba(38, 94, 155, 0.25)); transition: height 0.4s ease, y 0.4s ease; }
+    .bar-gradient { 
+      fill: url(#barGrad); 
+      filter: drop-shadow(0px 4px 3px rgba(38, 94, 155, 0.25)); 
+      transform-box: fill-box; 
+      transform-origin: bottom; 
+    }
     .bar-gradient:hover { fill: url(#barGradHover); filter: drop-shadow(0px 6px 6px rgba(38, 94, 155, 0.4)); cursor: pointer; }
+    /* Stats KPI row: 4 cards on one row, sizes scale with the screen (scoped to .kpi-grid, does not touch Tracking) */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(0.5rem, 0.9vw, 1rem); margin-bottom: 1.5rem; }
+    .kpi-grid > div { min-width: 0; padding: clamp(0.75rem, 1vw, 1.25rem); gap: 0.5rem; }
+    .kpi-grid .uppercase { font-size: clamp(9px, 0.35vw + 5px, 11px); letter-spacing: 0.04em; }
+    .kpi-grid .text-3xl { font-size: clamp(1.25rem, 0.55rem + 1.2vw, 2rem); line-height: 1.15; }
+    .kpi-grid .text-xs { font-size: clamp(10px, 0.3vw + 6px, 12px); }
+    .kpi-grid .flex.items-baseline { flex-wrap: wrap; column-gap: 0.4rem; row-gap: 0; }
+    .kpi-grid > div > div:last-child { width: clamp(2rem, 2.4vw, 3rem); height: clamp(2rem, 2.4vw, 3rem); }
+    .kpi-grid > div > div:last-child svg { width: 55%; height: 55%; }
+    @media (max-width: 1100px) { .kpi-grid > div > div:last-child { display: none; } }
+    @media (max-width: 640px)  { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     
     /* Áp dụng phông chữ Noto Serif cho toàn bộ trang */
     body {
@@ -172,20 +188,29 @@
       <div id="section-statistical" class="hidden">
 
         <!-- HEADER STATISTICAL OVERVIEW -->
-        <div class="mb-6 border-b border-slate-200 pb-4">
-          <h1 class="text-2xl font-bold text-slate-800 uppercase tracking-wide">C/O ANALYTICS DASHBOARD</h1>
-          <p class="text-sm text-slate-500 mt-1">Monthly tracking trends and C/O form breakdown overview.</p>
+        <div class="mb-6 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-2 border-b border-[#E5E2DC]">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-block w-2 h-2 rounded-full bg-[#265E9B]"></span>
+              <span class="text-[10px] font-bold tracking-widest text-[#265E9B] uppercase">UNI Consulting Analytics</span>
+            </div>
+            <h1 class="text-2xl font-extrabold text-[#2A2F3A] tracking-tight">C/O ANALYTICS DASHBOARD</h1>
+            <p class="text-xs font-medium text-[#9A9CA1] mt-0.5">Monthly volume tracking and Form distribution metrics.</p>
+          </div>
+          <div class="text-[11px] font-semibold text-[#9A9CA1]">
+            Updated: Real-time sync
+          </div>
         </div>
 
         <!-- MODERN KPI CARDS OVERVIEW -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <!-- CARD 1: TOTAL C/O ISSUED YTD -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <!-- CARD 1: TOTAL C/O ISSUED -->
           <div class="bg-white p-5 rounded-xl border border-[#E5E2DC] shadow-sm hover:shadow transition-all duration-200 flex items-center justify-between">
             <div class="space-y-1">
-              <span class="text-[11px] font-bold tracking-wider text-[#9A9CA1] uppercase">Total C/O Issued YTD</span>
+              <span class="text-[11px] font-bold tracking-wider text-[#9A9CA1] uppercase">Total C/O Issued</span>
               <div class="flex items-baseline gap-2">
                 <span id="kpi-total-co" class="text-3xl font-extrabold text-[#2A2F3A] tracking-tight">0</span>
-                <span class="text-xs font-semibold text-[#9A9CA1]">files</span>
+                <span class="text-xs font-semibold text-[#9A9CA1]">C/O</span>
               </div>
               <div class="pt-1">
                 <span id="kpi-year-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EAF0F8] text-[#234A7A] border border-[#B7CBE2]">FY 2026</span>
@@ -240,11 +265,32 @@
               </svg>
             </div>
           </div>
+          
+          <!-- CARD 4: AVG. PROCESSING TIME -->
+          <div class="bg-white p-5 rounded-xl border border-[#E5E2DC] shadow-sm hover:shadow transition-all duration-200 flex items-center justify-between" title="Working days (Mon-Fri, excluding public holidays) from ETD + 1 working day to the C/O declaration date">
+            <div class="space-y-1">
+              <span class="text-[11px] font-bold tracking-wider text-[#9A9CA1] uppercase">Avg. Processing Time</span>
+              <div class="flex items-baseline gap-2">
+                <span id="kpi-proc-avg" class="text-3xl font-extrabold text-[#2A2F3A] tracking-tight">—</span>
+                <span class="text-xs font-semibold text-[#9A9CA1]">days</span>
+              </div>
+              <div class="pt-1">
+                <span id="kpi-proc-sub" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EFEAF8] text-[#5B3FA0] border border-[#D5C9EE]">No data</span>
+              </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-[#EFEAF8] flex items-center justify-center text-[#6F4FB8] shrink-0">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
 
-          <div class="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <!-- Đặt max-w và căn chỉnh để màn hình rộng không bị bè ngang -->
+          <div class="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 border-b pb-3">
               <h2 class="text-base font-bold text-slate-800 uppercase tracking-wide">CHART OF THE NUMBER OF ISSUED C/O</h2>
               <div class="flex items-center gap-2">
@@ -258,10 +304,6 @@
           <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
             <div class="flex items-center justify-between gap-2 mb-4 border-b pb-3">
               <h2 class="text-base font-bold text-slate-800 uppercase tracking-wide">CHART OF C/O ISSUANCE VOLUME</h2>
-              <div class="flex items-center gap-1.5">
-                <button id="donut-btn-2025" onclick="setChartYear(2025)" class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">2025</button>
-                <button id="donut-btn-2026" onclick="setChartYear(2026)" class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">2026</button>
-              </div>
             </div>
             <div class="flex items-center gap-4">
               <div id="form-donut" class="shrink-0"></div>
@@ -865,9 +907,9 @@
     function setChartYear(y){ chartYear=y; renderChart(); renderFormDonut(); }
 
     const FORM_COLORS = {
-      'EUR1': '#16a34a', 'D': '#2563eb', 'B': '#f59e0b', 'UAE': '#7c3aed',
-      'AI': '#14b8a6', 'VJ': '#db2777', 'CPTPP': '#06b6d4', 'E': '#84cc16',
-      'NO': '#64748b', '---': '#94a3b8'
+      'EUR.1': '#4f46e5', 'EUR.1 UK': '#38bdf8', 'E': '#84cc16', 'B': '#f59e0b',
+      'AANZ': '#a855f7', 'D': '#1d4ed8', 'VJ': '#db2777', 'AI': '#14b8a6',
+      'CPTPP': '#06b6d4', 'NO': '#64748b', '---': '#94a3b8'
     };
     const FORM_FALLBACK = ['#4f46e5','#0ea5e9','#a855f7','#059669','#d97706','#0d9488','#2563eb','#7c3aed'];
     let _formColorIdx = 0; const _formColorCache = {};
@@ -908,15 +950,25 @@
       }
 
       const R = 60, CX = 80, CY = 80, SW = 24, C = 2*Math.PI*R;
+      // Same look as the bars: lighter top -> base color bottom, soft blue shadow
+      const lighten = (hex, t) => {
+        if (!/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+        const n = parseInt(hex.slice(1), 16), m = c => Math.round(c + (255 - c) * t);
+        return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(c => m(c).toString(16).padStart(2, '0')).join('');
+      };
+      // x1=1 -> x2=0 because every circle is rotated -90deg: on screen the gradient runs top -> bottom
+      const defs = donutEntries.map(([form,v,color],i) =>
+        `<linearGradient id="donutGrad${i}" x1="1" y1="0" x2="0" y2="0"><stop offset="0%" stop-color="${lighten(color,0.1)}"/><stop offset="100%" stop-color="${color}"/></linearGradient>`
+      ).join('');
       let acc = 0;
       const segs = donutEntries.map(([form,v,color],i) => {
         const seg = (v/donutTotal)*C;
         const animClass = !hasAnimatedStats ? 'donut-anim' : '';
-        const el = `<circle class="${animClass}" cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${color}" stroke-width="${SW}" data-sw="${SW}" stroke-dasharray="${seg} ${C-seg}" stroke-dashoffset="${-acc}" transform="rotate(-90 ${CX} ${CY})" style="cursor:pointer;transition:stroke-width .15s ease,opacity .15s ease;" onmouseover="donutHover(${i})" onmouseout="donutHover(-1)"></circle>`;
+        const el = `<circle class="${animClass}" cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="url(#donutGrad${i})" stroke-width="${SW}" data-sw="${SW}" stroke-dasharray="${seg} ${C-seg}" stroke-dashoffset="${-acc}" transform="rotate(-90 ${CX} ${CY})" style="cursor:pointer;transition:stroke-width .15s ease,opacity .15s ease;" onmouseover="donutHover(${i})" onmouseout="donutHover(-1)"></circle>`;
         acc += seg; return el;
       }).join('');
 
-      svgWrap.innerHTML = `<svg width="160" height="160" viewBox="0 0 160 160">${segs}<text id="donut-center-num" x="${CX}" y="${CY-2}" text-anchor="middle" style="fill:#1e293b;font-size:24px;font-weight:700;">${donutTotal}</text><text id="donut-center-label" x="${CX}" y="${CY+16}" text-anchor="middle" style="fill:#94a3b8;font-size:10px;">C/O</text></svg>`;
+      svgWrap.innerHTML = `<svg width="160" height="160" viewBox="0 0 160 160" style="overflow:visible"><defs>${defs}</defs><g style="filter:drop-shadow(0px 4px 3px rgba(38,94,155,0.25));">${segs}</g><text id="donut-center-num" x="${CX}" y="${CY-2}" text-anchor="middle" style="fill:#1e293b;font-size:24px;font-weight:700;">${donutTotal}</text><text id="donut-center-label" x="${CX}" y="${CY+16}" text-anchor="middle" style="fill:#94a3b8;font-size:10px;">C/O</text></svg>`;
 
       legend.innerHTML = donutEntries.map(([form,v,color],i) => {
         const pct = ((v/donutTotal)*100).toFixed(0);
@@ -926,6 +978,106 @@
 
       donutHover(-1);
       updateStatsKPIs();
+    }
+    // ===== Avg. Processing Time: ETD (+1 working day) -> C/O declaration date =====
+    // Working days = Mon-Fri, excluding public holidays (holidays are treated like Sat/Sun)
+    const CUSTOMER_LAG_WORKDAYS = 1;   // customer sends documents 1 working day after ETD
+    
+    // Only these forms are measured (the other forms have long deadlines)
+    const PROC_FORMS = new Set(['EUR.1', 'E', 'D', 'AI', 'B', 'EUR.1 UK', 'VJ']);
+
+    // Public holidays that fall on weekdays (incl. official days off in lieu), from the official notices.
+    // Add the next year's dates when they are announced; a missing date simply counts as a working day.
+    const VN_HOLIDAYS = [
+      // 2025: New Year, Tet, Hung Kings, 30/4 + 1/5, National Day
+      '2025-01-01', '2025-01-27', '2025-01-28', '2025-01-29', '2025-01-30', '2025-01-31',
+      '2025-04-07', '2025-04-30', '2025-05-01', '2025-05-02', '2025-09-01', '2025-09-02',
+      // 2026: New Year, Tet, Hung Kings (day off in lieu), 30/4 + 1/5, National Day
+      '2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20',
+      '2026-04-27', '2026-04-30', '2026-05-01', '2026-08-31', '2026-09-01', '2026-09-02'
+    ];
+
+    // y/m/d -> UTC day number; null if the date does not exist (e.g. 31.04)
+    function toDayNum(y, m, d) {
+      const t = Date.UTC(y, m - 1, d);
+      const dt = new Date(t);
+      if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+      return Math.round(t / 86400000);
+    }
+
+    const HOLIDAY_DAYS = new Set(VN_HOLIDAYS.map(h => { const p = h.split('-').map(Number); return toDayNum(p[0], p[1], p[2]); }));
+
+    // ECOSYS ngay_khai -> day number (same calendar date the ECOSYS table shows)
+    function khaiToDayNum(s) {
+      if (!s) return null;
+      const str = String(s);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) { const p = str.split('-').map(Number); return toDayNum(p[0], p[1], p[2]); }
+      const dt = new Date(str);
+      return isNaN(dt.getTime()) ? null : toDayNum(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+    }
+
+    // Tracking ETD ("DD.MM" or "DD.MM.YYYY") -> day number. No year -> year of the declaration date;
+    // if that lands after the declaration date (ETD 30.12, khai 02.01) use the previous year.
+    function etdToDayNum(etd, khaiDay) {
+      const m = String(etd || '').trim().match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?$/);
+      if (!m) return null;
+      const d = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+      if (m[3]) return toDayNum(parseInt(m[3], 10), mo, d);
+      const khaiYear = new Date(khaiDay * 86400000).getUTCFullYear();
+      let n = toDayNum(khaiYear, mo, d);
+      if (n !== null && n > khaiDay) n = toDayNum(khaiYear - 1, mo, d);
+      return n;
+    }
+
+    // Number of working days (Mon-Fri, not a public holiday) in (a, b]  (a excluded, b included)
+    function workdaysAfter(a, b) {
+      let c = 0;
+      for (let x = a + 1; x <= b; x++) {
+        const wd = new Date(x * 86400000).getUTCDay();
+        if (wd !== 0 && wd !== 6 && !HOLIDAY_DAYS.has(x)) c++;
+      }
+      return c;
+    }
+
+    // One sample per C/O (a declaration can have 2+ C/O); grouped by the year of the declaration date
+    function computeProcessingTime(year) {
+      const khaiByCo = new Map();                       // so_co -> earliest declaration date
+      (ecosysData || []).forEach(r => {
+        const co = (r.so_co || '').trim();
+        if (!co) return;
+        const form = (r.mau_co || '').replace(/^Mẫu\s+/i, '').trim().toUpperCase();   // same normalization as the donut
+        if (!PROC_FORMS.has(form)) return;
+        const dn = khaiToDayNum(r.ngay_khai);
+        if (dn === null) return;
+        if (!khaiByCo.has(co) || dn < khaiByCo.get(co)) khaiByCo.set(co, dn);
+      });
+
+      const samples = [];
+      (globalData || []).forEach(item => {
+        if (!item.etd || item.etd === '---') return;
+        const decl = extractDeclarationNumbers(item.xls_list);
+        if (!decl || decl === '---') return;
+        const cos = new Set();                          // all C/O of this row, each counted once
+        decl.split(',').map(s => normDigits(s)).filter(Boolean).forEach(n => {
+          const set = ecosysByToKhai.get(n);
+          if (set) set.forEach(co => cos.add(co));
+        });
+        cos.forEach(co => {
+          const khai = khaiByCo.get(co);
+          if (khai === undefined) return;
+          if (new Date(khai * 86400000).getUTCFullYear() !== year) return;
+          const etd = etdToDayNum(item.etd, khai);
+          if (etd === null) return;                      // unreadable ETD -> excluded (ETD after khai counts as 0)
+          samples.push(Math.max(0, workdaysAfter(etd, khai) - CUSTOMER_LAG_WORKDAYS));
+        });
+      });
+
+      const n = samples.length;
+      if (!n) return { n: 0, avg: 0, median: 0 };
+      samples.sort((a, b) => a - b);
+      const avg = samples.reduce((a, b) => a + b, 0) / n;
+      const median = n % 2 ? samples[(n - 1) / 2] : (samples[n / 2 - 1] + samples[n / 2]) / 2;
+      return { n, avg, median };
     }
 
     // Tự động tính toán chỉ số cho 3 thẻ KPI theo bảng màu Design System
@@ -973,6 +1125,13 @@
 
       if (elAvg) animateValue(elAvg, 0, avgValue, 1800);
       if (elActiveMonths) elActiveMonths.textContent = activeMonths > 0 ? `${activeMonths} Months` : '0 Months';
+      
+      // 4. Avg. Processing Time
+      const elProc = document.getElementById('kpi-proc-avg');
+      const elProcSub = document.getElementById('kpi-proc-sub');
+      const pt = computeProcessingTime(chartYear);
+      if (elProc) elProc.textContent = pt.n ? pt.avg.toFixed(1) : '—';
+      if (elProcSub) elProcSub.textContent = pt.n ? `Median ${pt.median.toFixed(1)} d · n = ${pt.n}` : 'No data';
     }
 
     function donutHover(i) {
@@ -1005,17 +1164,30 @@
 
       const now=new Date(), curY=now.getFullYear(), curM=now.getMonth()+1;
       let n=12; if(chartYear>curY) n=0; else if(chartYear===curY) n=curM;
-      if(n===0){ wrap.innerHTML='<div class="text-sm text-slate-400 py-12 text-center w-full">Chưa tới năm '+chartYear+'</div>'; return; }
+      if(n===0){ wrap.innerHTML='<div class="w-full py-16 text-center text-sm text-slate-400">'+chartYear+' has not started yet</div>'; return; }
 
       const monthly=countIssuedByMonth(chartYear).slice(0,n);
+      if(monthly.every(v=>v===0)){ wrap.innerHTML='<div class="w-full py-16 text-center text-sm text-slate-400">No C/O issued in '+chartYear+'</div>'; return; }
       const cum=[]; monthly.reduce((a,v,i)=>{ const t=a+v; cum[i]=t; return t; },0);
-      const maxM=Math.max(1,...monthly), maxC=Math.max(1,cum[cum.length-1]||1);
-      const names=['01','02','03','04','05','06','07','08','09','10','11','12'];
 
-      const slot=56,padL=24,padR=24,padT=30,padB=26,H=240;
-      const W=padL+padR+n*slot, Hp=H-padT-padB, bw=slot*0.55;
-      
-      // Vẽ các đường lưới ngang nền (Grid lines) tinh tế
+      const maxM = Math.max(1, ...monthly);
+      const maxC = Math.max(1, cum[cum.length - 1] || 1);
+      const names = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+
+      // Current year: the running month is drawn dashed/light, months not reached yet are empty dashed slots
+      const SHOW_UPCOMING = true;                              // set to false to hide the empty upcoming months
+      const inProgressIdx = (chartYear===curY) ? n-1 : -1;
+      const slots = (SHOW_UPCOMING && chartYear===curY) ? 12 : n;
+
+      // Draw with the real pixel width of the container so wide screens do not stretch the chart
+      _chartW = Math.round(wrap.clientWidth);
+      const W = Math.max(_chartW, 360);
+      const H = Math.round(Math.min(360, Math.max(275, W * 0.27)));
+      const padL = 14, padR = 64, padT = 36, padB = 30;
+      const slot = (W - padL - padR) / slots, Hp = H - padT - padB;
+      const bw = Math.min(slot * 0.55, 64);
+      const baseY = padT + Hp;
+
       let gridLines = '';
       const gridSteps = 4;
       for(let g=0; g<=gridSteps; g++) {
@@ -1023,23 +1195,39 @@
         gridLines += `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3 3"/>`;
       }
 
-      let bars='', pts=[];
+      let bars='', pts=[[padL, baseY, 0]];                    // origin point (0,0)
       monthly.forEach((v,i)=>{
-        const x=padL+i*slot+(slot-bw)/2, h=Math.round((v/maxM)*Hp), y=padT+(Hp-h);
-        const animClass = !hasAnimatedStats ? 'style="animation: barRise 1.8s ease-out forwards;"' : '';
-        bars+=`<rect class="bar-gradient" x="${x}" y="${y}" width="${bw}" height="${h}" rx="4" ry="4" ${animClass}></rect>`
-            + `<text x="${x+bw/2}" y="${y-6}" text-anchor="middle" style="fill:#1e293b;font-size:11px;font-weight:700;">${v}</text>`
-            + `<text x="${x+bw/2}" y="${H-8}" text-anchor="middle" style="fill:#64748b;font-size:11px;font-weight:600;">${names[i]}</text>`;
-        const cx=padL+i*slot+slot/2, cy=padT+(Hp-Math.round((cum[i]/maxC)*Hp));
+        const cx=padL+i*slot+slot/2, x=cx-bw/2, h=Math.round((v/maxM)*Hp), y=baseY-h;
+        const animCss = !hasAnimatedStats ? 'animation: barRise 1.8s ease-out forwards;' : '';
+        if(i===inProgressIdx){
+          bars+=`<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="4" ry="4" style="fill:#265E9B;fill-opacity:0.25;stroke:#265E9B;stroke-width:1.5;stroke-dasharray:4 3;transform-box:fill-box;transform-origin:bottom;${animCss}"></rect>`;
+          if(slot>=44) bars+=`<text x="${cx}" y="${y-20}" text-anchor="middle" style="fill:#64748b;font-size:10px;font-weight:600;">In progress</text>`;
+        } else {
+          bars+=`<rect class="bar-gradient" x="${x}" y="${y}" width="${bw}" height="${h}" rx="4" ry="4" ${animCss?`style="${animCss}"`:''}></rect>`;
+        }
+        bars+=`<text x="${cx}" y="${y-6}" text-anchor="middle" style="fill:#1e293b;font-size:11px;font-weight:700;">${v}</text>`
+            + `<text x="${cx}" y="${H-8}" text-anchor="middle" style="fill:#64748b;font-size:11px;font-weight:600;">${names[i]}</text>`;
+
+        const cy = baseY - Math.round((cum[i]/maxC)*Hp);
         pts.push([cx,cy,cum[i]]);
       });
-      const line=pts.map((p,i)=>(i===0?'M':'L')+p[0]+' '+p[1]).join(' ');
-      const dots=pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#f59e0b" stroke="#fff" stroke-width="2" style="filter:drop-shadow(0px 2px 2px rgba(0,0,0,0.15))"></circle>`).join('');
-      const lp=pts[pts.length-1];
-      const clab = lp ? `<text x="${lp[0]}" y="${lp[1]-16}" text-anchor="middle" style="fill:#b45309;font-size:12px;font-weight:800;filter:drop-shadow(0px 1px 2px rgba(255,255,255,0.9));">${lp[2]}</text>` : '';
-      const lineAnimClass = !hasAnimatedStats ? 'line-anim' : '';
 
-      wrap.innerHTML=`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      // Upcoming months: empty dashed slot, no value
+      for(let i=n;i<slots;i++){
+        const cx=padL+i*slot+slot/2, x=cx-bw/2;
+        bars+=`<rect x="${x}" y="${baseY-24}" width="${bw}" height="24" rx="4" ry="4" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 3"></rect>`
+            + `<text x="${cx}" y="${H-8}" text-anchor="middle" style="fill:#cbd5e1;font-size:11px;font-weight:600;">${names[i]}</text>`;
+      }
+
+      const line=pts.map((p,i)=>(i===0?'M':'L')+p[0]+' '+p[1]).join(' ');
+      const dots=pts.slice(1).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#f59e0b" stroke="#fff" stroke-width="2" style="filter:drop-shadow(0px 2px 2px rgba(0,0,0,0.15))"></circle>`).join('');
+      const lineAnimClass = !hasAnimatedStats ? 'line-anim' : '';
+      if (!hasAnimatedStats) _chartAnimUntil = Date.now() + 1900;
+      const lp = pts[pts.length-1];
+      const clab = `<text x="${lp[0]+bw/2+8}" y="${lp[1]+4}" text-anchor="start" style="fill:#b45309;font-size:13px;font-weight:800;">${lp[2].toLocaleString('en-US')}</text>`;
+
+      // pathLength="1000" keeps the draw-in animation (dasharray 1000) complete at any width
+      wrap.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto;">
         <defs>
           <linearGradient id="barGrad" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stop-color="#4688d2"/>
@@ -1052,11 +1240,26 @@
         </defs>
         ${gridLines}
         ${bars}
-        <path class="${lineAnimClass}" d="${line}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0px 2px 2px rgba(0,0,0,0.1))"></path>
+        <path class="${lineAnimClass}" pathLength="1000" d="${line}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0px 2px 2px rgba(0,0,0,0.1))"></path>
         ${dots}
         ${clab}
       </svg>`;
     }
+
+    // Vẽ lại biểu đồ khi đổi kích thước cửa sổ / màn hình
+    let _chartW = 0;
+    let _chartAnimUntil = 0;   // thời điểm animation lần đầu kết thúc
+    (function(){
+      const el = document.getElementById('chart-bars');
+      if (!el || !window.ResizeObserver) return;
+      new ResizeObserver(() => {
+        const w = Math.round(el.clientWidth);
+        if (!w || Math.abs(w - _chartW) < 40) return;          // bỏ qua thay đổi nhỏ (thanh cuộn 15-17px)
+        const wait = _chartAnimUntil - Date.now();
+        if (wait > 0) { setTimeout(renderChart, wait + 50); return; } // đợi animation chạy xong rồi mới vẽ lại
+        renderChart();
+      }).observe(el);
+    })();
 
     // Khóa sắp xếp theo Date PL ("DD.MM" + source_year); không có PL -> xuống cuối
     function plSortKey(item) {
