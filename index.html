@@ -616,15 +616,16 @@
             </div>
           </div>
 
-          <!-- DOCS DETAIL: document log of all records -->
+          <!-- DOCS DETAIL: one row per record, with document checks -->
           <div id="ecosys-mode-docs" class="hidden">
-            <div class="flex flex-wrap items-center gap-2 mb-4">
-              <input id="ecosys-docs-search" type="text"
-                placeholder="Search file name, receipt no. or document type..."
-                onkeydown="if (event.key === 'Enter') ecosysDocsLoad(true)"
-                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-96 focus:outline-none focus:ring-2 focus:ring-blue-300">
-              <button onclick="ecosysDocsLoad(true)"
-                class="bg-sidebar-main hover:opacity-90 active:scale-95 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Search</button>
+            <div class="flex flex-wrap items-start gap-3 mb-4">
+              <textarea id="ecosys-docs-search" rows="2"
+                placeholder="Search ECIS or C/O No."
+                oninput="ecosysDocsApply(true)"
+                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-80 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-y"></textarea>
+              <button id="ecosys-docs-issues-btn" onclick="ecosysDocsToggleIssues()"
+                class="px-4 py-2 rounded-lg border text-sm font-semibold transition bg-white text-slate-600 border-slate-300 hover:bg-slate-50">Only issues</button>
+              <span id="ecosys-docs-issues-info" class="text-xs text-slate-500 font-medium self-center"></span>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full min-w-[1000px] text-left border-collapse text-xs">
@@ -632,11 +633,10 @@
                   <tr>
                     <th class="py-3 px-3">No.</th>
                     <th class="py-3 px-3">Receipt No.</th>
-                    <th class="py-3 px-3">File name</th>
+                    <th class="py-3 px-3">C/O No.</th>
+                    <th class="py-3 px-3">Form C/O</th>
+                    <th class="py-3 px-3">ECIS</th>
                     <th class="py-3 px-3">Document type</th>
-                    <th class="py-3 px-3">Size</th>
-                    <th class="py-3 px-3">Uploaded</th>
-                    <th class="py-3 px-3">Deleted</th>
                     <th class="py-3 px-3">Detail</th>
                   </tr>
                 </thead>
@@ -644,9 +644,10 @@
               </table>
             </div>
             <div class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <span id="ecosys-docs-info" class="text-xs text-slate-500 font-medium">0 documents</span>
+              <span id="ecosys-docs-info" class="text-xs text-slate-500 font-medium">0 records</span>
               <div id="ecosys-docs-pagination" class="flex items-center gap-1.5 flex-wrap"></div>
             </div>
+            <div id="ecosys-docs-note" class="mt-2 text-[11px] text-slate-400"></div>
           </div>
 
           <!-- THỐNG KÊ + TÌM KIẾM ECOSYS -->
@@ -701,6 +702,7 @@
                   <th class="py-3 px-3">Ngày Duyệt</th>
                   <th class="py-3 px-3">Ngày Cấp Phép</th>
                   <th class="py-3 px-3">Doanh Nghiệp Ký</th>
+                  <th id="ecosys-th-reason" class="py-3 px-3 hidden">Rejection reason</th>
                   <th class="py-3 px-3">Detail</th>
                 </tr>
               </thead>
@@ -911,7 +913,9 @@
     let ecosysDetailKeys = new Set();   // receipt numbers that have a stored detail row
     let ecosysDocsPage = 1;
     let ecosysDocsTotal = 0;
-    let ecosysDocsReq = 0;              // request counter, so an old answer never overwrites a newer one
+    let ecosysDocsReq = 0;
+    let ecosysKpiFilter = null;         // null = all; 'draft' | 'approved' | 'gddn' | 'pending' | 'rejected'
+    let ecosysReasons = new Map();      // receipt no. -> reason of the latest rejection             // request counter, so an old answer never overwrites a newer one
 
     function normDigits(s) {
       return (s == null ? '' : String(s)).replace(/\D/g, '');
@@ -2143,6 +2147,8 @@
 
     // ---------------- LOGIC TRUY VẤN ECOSYS 11 CỘT ----------------
     function countEcosysStatus(status) {
+      const lc = (status || '').toLowerCase();
+      if (lc.includes('h\u1ee7y') || lc.includes('hu\u1ef7')) return 'other';   // cancelled statuses are not part of any card
       const u = (status || '').toLowerCase();
       if (u.includes('từ chối')) return 'rejected';
       if (u.includes('nháp')) return 'draft';
@@ -2165,6 +2171,15 @@
     }
 
     function applyEcosysFilter() {
+      ecosysApplyFilterCore();
+      if (ecosysKpiFilter === 'draft') {
+        // drafts: newest created record first
+        ecosysView.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        renderEcosys();
+      }
+    }
+
+    function ecosysApplyFilterCore() {
       const coEl = document.getElementById('ecosys-search-co');
       const tkEl = document.getElementById('ecosys-search-tk');
       const coTerms = (coEl ? coEl.value : '').split(/[\n,\s]+/).map(t => t.trim().toLowerCase()).filter(Boolean);
@@ -2174,7 +2189,8 @@
         const tk = (r.so_to_khai || '').replace(/\D/g, '');
         const okCo = coTerms.length === 0 || coTerms.some(t => co.includes(t));
         const okTk = tkTerms.length === 0 || tkTerms.some(t => tk.includes(t));
-        return okCo && okTk;
+        const okKpi = !ecosysKpiFilter || countEcosysStatus(r.trang_thai) === ecosysKpiFilter;
+        return okCo && okTk && okKpi;
       });
       ecosysPage = 1;
       renderEcosys();
@@ -2303,7 +2319,7 @@
       }
 
       const all = data || [];
-      const rows = all.filter(r => !String(r.trang_thai_txt || '').toLowerCase().includes(ECOSYS_CANCEL_WORD));
+      const rows = all.filter(r => !docsIsCancelled(r.trang_thai_txt));
       const hidden = all.length - rows.length;
 
       if (rows.length === 0) {
@@ -2464,67 +2480,681 @@
         </div>`;
     }
 
-    // ---- Docs detail: document log of all records (server-side search and paging) ----
-    async function ecosysDocsLoad(reset) {
-      if (reset) ecosysDocsPage = 1;
-      const reqId = ++ecosysDocsReq;
-      const body = document.getElementById('ecosys-docs-body');
-      const info = document.getElementById('ecosys-docs-info');
-      const term = (document.getElementById('ecosys-docs-search').value || '').trim().replace(/[\\"]/g, '');
-      const from = (ecosysDocsPage - 1) * ECOSYS_DOCS_PER_PAGE;
+const DOCS_INV_SPECIAL = ['B', 'D', 'E', 'AI'];       // forms whose INV files are named _INV and number (declarations + 1)
+const DOCS_NO_PLX = ['B', 'D', 'UAE-VN'];             // forms that never need a PLX
+const DOCS_TYPE_MAP = {                               // document type code -> kind that is checked (other codes are ignored)
+  ToKhaiHQNK: 'INV',
+  TRANSPORT_DOC: 'Bill',
+  DOC_BL: 'BK',
+  DOC_KKHH: 'BK',
+  QUYTRINHSX: 'QTSX',
+  DOC_CHUNGTUKHAC: 'TKN',
+  DOC_CAMKETXUATXU: 'PLX'
+};
+const DOCS_LABEL_ORDER = { 'Declaration': 0, 'INV': 1, 'Bill': 2, 'BK': 3, 'QTSX': 4, 'TKN+VAT': 5, 'Other': 6, 'PLX': 7 };
+let docsPlxFlags = new Map();
 
-      body.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400 font-medium">Loading...</td></tr>';
+function docsDeclIndex(code) {
+  const m = /^ToKhaiXuatKhau_(\d+)$/i.exec(code || '');
+  return m ? parseInt(m[1], 10) : null;
+}
 
-      let q = supabaseClient.from('ecosys_docs').select('*', { count: 'exact' });
-      if (term) {
-        const p = '"%' + term + '%"';
-        q = q.or(`ten_tai_lieu.ilike.${p},so_tiep_nhan.ilike.${p},loai_tai_lieu_txt.ilike.${p}`);
-      }
-      q = q.order('created_date', { ascending: false, nullsFirst: false })
-        .order('id', { ascending: true })
-        .range(from, from + ECOSYS_DOCS_PER_PAGE - 1);
+// Which checked kind a document belongs to: 'DECL', 'INV', 'Bill', 'BK', 'QTSX', 'TKN', 'PLX' or null (ignored)
+function docsKind(r) {
+  if (docsDeclIndex(r.loai_tai_lieu) !== null) return 'DECL';
+  if (/_3\d{11}\.(xls|pdf)$/i.test(r.ten_tai_lieu || '')) return 'DECL';   // exactly 12 digits, starting with 3
+  const k = DOCS_TYPE_MAP[r.loai_tai_lieu];
+  if (k) return k;
+  return null;
+}
 
-      const { data, error, count } = await q;
-      if (reqId !== ecosysDocsReq) return;   // a newer request has been made meanwhile
+// Names that belong to a specific document type (ECIS..._B / _BK / _QTSX / _PLX / _<number> / _INV)
+function docsLooksLike(name) {
+  const m = /^ECIS\d+_(.*)$/i.exec(name || '');
+  if (!m) return null;
+  const rest = m[1];
+  if (/^BK/i.test(rest)) return 'BK';
+  if (/^QTSX/i.test(rest)) return 'QTSX';
+  if (/^PLX/i.test(rest)) return 'PLX';
+  if (/^B(?![0-9A-Za-z])/i.test(rest)) return 'Bill';
+  if (/^\d/.test(rest) || /_INV/i.test(name)) return 'INV';
+  return null;
+}
 
-      if (error) {
-        body.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-red-600 font-medium">Failed to load documents: ${ecoEsc(error.message)}</td></tr>`;
+function docsFmtPart(label, have, need, counted) {
+  if (counted) return have === need ? `${label} ×${need}` : `${label} ×${have}/${need}`;
+  return have === need ? label : `${label} ×${have}/${need}`;
+}
+
+function docsEvaluate(rec, rows) {
+  const D = rec.decls;
+  const k = D.length;
+  const ecisList = rec.ecis;
+  const ecisUp = ecisList.map(e => e.toUpperCase());
+  const ecisTxt = ecisList.join(', ');
+  const ev = { files: [], missing: [], parts: [], ok: true, plxControl: false, plain: false };
+  const live = rows.filter(r => !r.ngay_xoa_file);
+  if (live.length === 0) {
+    ev.missing.push({ label: '-', reason: 'No documents' });
+    ev.ok = false;
+    return ev;
+  }
+  const ts = (v) => (v ? new Date(v).getTime() : 0);
+
+  // ---------- Declaration files ----------
+  const decl = rows.filter(r => docsKind(r) === 'DECL');
+  const dLive = decl.filter(r => !r.ngay_xoa_file);
+  const dDel = decl.filter(r => r.ngay_xoa_file);
+  let maxDel = -1;
+  dDel.forEach(r => {
+    const i = docsDeclIndex(r.loai_tai_lieu);
+    if (i !== null && i > maxDel) maxDel = i;
+  });
+  const lastDelAt = dDel.reduce((mx, r) => Math.max(mx, ts(r.ngay_xoa_file)), 0);
+  // every live declaration file was uploaded after the last deletion = the whole set was replaced
+  const fullRepl = dDel.length > 0 && dLive.length > 0 && dLive.every(r => ts(r.created_date) > lastDelAt);
+
+  const dState = new Map();
+  const used = new Set();
+  if (k === 0) ev.missing.push({ label: 'Declaration', reason: 'No declaration number in this record' });
+  D.forEach((d, i) => {
+    const hits = dLive.filter(r => (r.ten_tai_lieu || '').includes(d));
+    if (hits.length === 0) {
+      ev.missing.push({ label: 'Declaration', reason: `Missing declaration file for ${d} (expected ToKhaiXuatKhau_${i})` });
+      return;
+    }
+    hits.forEach(h => used.add(h));
+    if (hits.length > 1) {
+      hits.forEach(h => dState.set(h, `${hits.length} files contain declaration ${d}`));
+      return;
+    }
+    const f = hits[0];
+    const m = docsDeclIndex(f.loai_tai_lieu);
+    let exp;
+    if (fullRepl) {
+      // normal: the same _i again; fallback when _0.. are gone: _n+1+i
+      exp = [i, maxDel + 1 + i];
+    } else {
+      // normal: _i; a replaced file may take (highest index created before it) + 1
+      const before = decl.filter(x => ts(x.created_date) < ts(f.created_date))
+        .map(x => docsDeclIndex(x.loai_tai_lieu)).filter(v => v !== null);
+      exp = [i, before.length ? Math.max(...before) + 1 : i];
+    }
+    if (m === null) dState.set(f, `Type is ${f.loai_tai_lieu || 'unknown'}, expected ToKhaiXuatKhau_${i}`);
+    else if (!exp.includes(m)) dState.set(f, `Type is _${m}, expected _${i}`);
+    else dState.set(f, null);
+  });
+  dLive.forEach(r => {
+    if (!used.has(r)) dState.set(r, 'Extra declaration file: its number is not in the declaration list');
+  });
+  const typeCount = {};
+  dLive.forEach(r => {
+    const m = docsDeclIndex(r.loai_tai_lieu);
+    if (m !== null) typeCount[m] = (typeCount[m] || 0) + 1;
+  });
+  dLive.forEach(r => {
+    const m = docsDeclIndex(r.loai_tai_lieu);
+    if (m !== null && typeCount[m] > 1 && !dState.get(r)) dState.set(r, `${typeCount[m]} files share type _${m}`);
+  });
+  dLive.forEach(r => ev.files.push({ name: r.ten_tai_lieu || '', label: 'Declaration', reason: dState.get(r) || null }));
+  const declGood = dLive.filter(r => !dState.get(r)).length;
+  ev.parts.push(docsFmtPart('Declaration', declGood, k, true));
+
+  // ---------- other documents ----------
+  const special = DOCS_INV_SPECIAL.includes(rec.form);
+  const others = live.filter(r => {
+    const kd = docsKind(r);
+    return kd && kd !== 'DECL';
+  });
+  const parsed = (name) => {
+    const m = /^(ECIS\d+)_(.*)$/i.exec(name || '');
+    return m ? { pre: m[1].toUpperCase(), rest: m[2] } : { pre: null, rest: name || '' };
+  };
+  const isPdf = (name) => /\.pdf$/i.test(name || '');
+  const restOk = {
+    Bill: (s) => /^B(?![0-9A-Za-z])/i.test(s),     // exactly "_B", not _BK / _BL / _B2
+    BK: (s) => /^BK/i.test(s),
+    QTSX: (s) => /^QTSX/i.test(s),
+    PLX: (s) => /^PLX/i.test(s)
+  };
+  const hint = { Bill: '_B', BK: '_BK', QTSX: '_QTSX', PLX: '_PLX' };
+  const labelOf = { INV: 'INV', Bill: 'Bill', BK: 'BK', QTSX: 'QTSX', PLX: 'PLX', TKN: 'TKN+VAT' };
+  const oState = new Map();
+  const valid = { INV: [], Bill: [], BK: [], QTSX: [], PLX: [], TKN: [] };
+  const wrong = { INV: 0, Bill: 0, BK: 0, QTSX: 0, PLX: 0, TKN: 0 };
+
+  others.forEach(r => {
+    const kind = docsKind(r);
+    const name = r.ten_tai_lieu || '';
+    const p = parsed(name);
+    if (kind === 'TKN') {
+      const main = /^(ECIS\d+_)?TKN\+VAT/i.test(name) && isPdf(name);
+      if (!main) {
+        // any name is fine here, except the names that belong to the other document types
+        const lookalike = docsLooksLike(name);
+        oState.set(r, { label: 'Other', reason: lookalike ? `Wrong upload: this name belongs to ${lookalike}, not to "Other documents"` : null });
         return;
       }
-
-      ecosysDocsTotal = count || 0;
-      const rows = data || [];
-      const cell = 'py-3 px-3 align-top whitespace-nowrap';
-
-      if (rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400 font-medium">No documents found.</td></tr>';
-      } else {
-        body.innerHTML = rows.map((x, i) => `
-          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-            <td class="${cell} font-medium text-slate-400">${from + i + 1}</td>
-            <td class="${cell} font-semibold text-slate-800">${ecoEsc(x.so_tiep_nhan || '---')}</td>
-            <td class="${cell} font-medium text-blue-600">${ecoEsc(x.ten_tai_lieu || '---')}</td>
-            <td class="${cell}">${ecoEsc(x.loai_tai_lieu_txt || x.loai_tai_lieu || '---')}</td>
-            <td class="${cell}">${ecoFmtSize(x.kich_thuoc)}</td>
-            <td class="${cell}">${ecoFmtTime(x.created_date)}</td>
-            <td class="${cell}">${x.ngay_xoa_file ? ecoFmtTime(x.ngay_xoa_file) : '---'}</td>
-            <td class="${cell}"><button onclick="ecosysShowDetail('${x.item_id}')" class="px-2.5 py-1 rounded-md border border-slate-300 bg-white text-slate-600 font-semibold hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition">Detail</button></td>
-          </tr>`).join('');
+      if (p.pre && !ecisUp.includes(p.pre)) {
+        oState.set(r, { label: 'TKN+VAT', reason: `Wrong upload: ECIS in the name (${p.pre}) differs from the record (${ecisTxt})` });
+        wrong.TKN++;
+        return;
       }
+      oState.set(r, { label: 'TKN+VAT', reason: null });
+      valid.TKN.push(r);
+      return;
+    }
+    let reason = null;
+    if (!isPdf(name)) reason = 'Wrong upload: the file must be a .pdf';
+    else if (!p.pre) reason = `Wrong upload: the name must start with ${ecisList[0]}_`;
+    else if (!ecisUp.includes(p.pre)) reason = `Wrong upload: ECIS in the name (${p.pre}) differs from the record (${ecisTxt})`;
+    else if (kind === 'INV') {
+      const okName = special ? /_INV/i.test(name) : /^\d/.test(p.rest);
+      if (!okName) reason = special ? 'Wrong upload: the name must contain _INV' : 'Wrong upload: the name must be ECIS…_<number>….pdf';
+    } else if (!restOk[kind](p.rest)) {
+      reason = `Wrong upload: the name must be ECIS…${hint[kind]}….pdf`;
+    }
+    oState.set(r, { label: labelOf[kind], reason });
+    if (reason) wrong[kind]++;
+    else valid[kind].push(r);
+  });
 
-      const totalPages = Math.ceil(ecosysDocsTotal / ECOSYS_DOCS_PER_PAGE) || 1;
-      info.innerText = ecosysDocsTotal === 0
-        ? '0 documents'
-        : `Showing ${from + 1} - ${from + rows.length} of ${ecosysDocsTotal} documents`;
-      renderPager('ecosys-docs-pagination', ecosysDocsPage, totalPages, 'changeEcosysDocsPage');
+  // INV: one per declaration (forms B, D, E, AI: declarations + 1)
+  const invNeed = special ? k + 1 : k;
+  const invHave = valid.INV.length;
+  if (invHave < invNeed) ev.missing.push({ label: 'INV', reason: `Missing INV: ${invHave} of ${invNeed} found` });
+  if (invHave > invNeed) valid.INV.forEach(r => { oState.get(r).reason = `Excess INV: ${invHave} found, ${invNeed} expected`; });
+  ev.parts.push(docsFmtPart('INV', invHave, invNeed, true));
+
+  // Bill / BK / QTSX: exactly one file
+  ['Bill', 'BK', 'QTSX'].forEach(kind => {
+    const have = valid[kind].length;
+    if (have === 0 && wrong[kind] === 0) ev.missing.push({ label: kind, reason: `Missing ${kind}` });
+    if (have > 1) valid[kind].forEach(r => { oState.get(r).reason = `Excess ${kind}: ${have} files, 1 expected`; });
+    ev.parts.push(docsFmtPart(kind, have, 1, false));
+  });
+
+  // TKN+VAT: at least one main file, any number of other files
+  const tknHave = valid.TKN.length;
+  if (tknHave === 0 && wrong.TKN === 0) ev.missing.push({ label: 'TKN+VAT', reason: 'Missing TKN+VAT (main file)' });
+  ev.parts.push(tknHave >= 1 ? 'TKN+VAT' : 'TKN+VAT ×0/1');
+
+  // PLX
+  const exempt = DOCS_NO_PLX.includes(rec.form);
+  const plxHave = valid.PLX.length;
+  if (plxHave > 1) valid.PLX.forEach(r => { oState.get(r).reason = `Excess PLX: ${plxHave} files, 1 expected`; });
+  if (plxHave >= 1) {
+    ev.parts.push(plxHave === 1 ? 'PLX' : `PLX ×${plxHave}/1`);
+  } else if (!exempt) {
+    if (wrong.PLX > 0) {
+      ev.parts.push('PLX ×0/1');
+    } else {
+      ev.plxControl = true;
+      const flag = docsPlxFlags.get(ecisUp[0]);
+      if (flag === undefined) {
+        ev.missing.push({ label: 'PLX', reason: 'PLX not confirmed: choose Yes or No below' });
+        ev.parts.push('PLX ?');
+      } else if (flag === true) {
+        ev.missing.push({ label: 'PLX', reason: 'Missing PLX (marked as required)' });
+        ev.parts.push('PLX ×0/1');
+      }
+    }
+  }
+
+  others.forEach(r => {
+    const s = oState.get(r);
+    ev.files.push({ name: r.ten_tai_lieu || '', label: s.label, reason: s.reason });
+  });
+  ev.files.sort((a, b) => ((DOCS_LABEL_ORDER[a.label] ?? 9) - (DOCS_LABEL_ORDER[b.label] ?? 9)) || a.name.localeCompare(b.name));
+  ev.ok = ev.missing.length === 0 && ev.files.every(f => !f.reason);
+  return ev;
+}
+
+// ---------- Docs detail: list + popup ----------
+const DOCS_CHECK_FROM = '2026-10-16';                 // records filed on/after this date are checked; older ones stay grey
+const DOCS_BTN_BASE = 'px-4 py-2 rounded-lg border text-sm font-semibold transition';
+let docsRecords = [];
+let docsByItem = new Map();
+let docsSkipped = 0;
+let docsLoadedAt = 0;
+let docsLoading = false;
+let docsOnlyIssues = false;
+let docsOpenId = null;
+
+// Cancelled records ("huy" = cancel, accent-insensitive) are not counted at all
+function docsIsCancelled(status) {
+  const n = String(status || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return /\bhuy\b/.test(n);
+}
+
+// declaration number -> set of ECIS (from the CO Tracking data)
+function docsBuildDeclToEcis() {
+  const map = new Map();
+  (globalData || []).forEach(item => {
+    const em = /ECIS\d+/i.exec(item.folder_name || '');
+    if (!em) return;
+    const ecis = em[0].toUpperCase();
+    const decl = extractDeclarationNumbers(item.xls_list);
+    if (!decl || decl === '---') return;
+    decl.split(',').map(s => normDigits(s)).filter(Boolean).forEach(n => {
+      if (!map.has(n)) map.set(n, new Set());
+      map.get(n).add(ecis);
+    });
+  });
+  return map;
+}
+
+async function docsFetchAll() {
+  if (typeof globalData === 'undefined' || !globalData || globalData.length === 0) {
+    throw new Error('CO Tracking data is not loaded yet. Open the CO Tracking tab once, then come back.');
+  }
+  const [detailRows, flagRes] = await Promise.all([
+    fetchAllRows(() => supabaseClient
+      .from('ecosys_detail')
+      .select('id, so_tiep_nhan, so_hieu_cap_phep_co, form_txt, trang_thai_txt, export_declaration_number, ngay_khai_co')
+      .order('id', { ascending: true })),
+    supabaseClient.from('ecosys_plx_flags').select('ecis, plx_needed')
+  ]);
+
+  docsPlxFlags = new Map();
+  if (flagRes.error) console.error('PLX flags error:', flagRes.error.message);
+  else (flagRes.data || []).forEach(r => docsPlxFlags.set(String(r.ecis).toUpperCase(), r.plx_needed));
+
+  const declToEcis = docsBuildDeclToEcis();
+  docsRecords = [];
+  docsSkipped = 0;
+  detailRows.forEach(d => {
+    if (docsIsCancelled(d.trang_thai_txt)) return;                     // cancelled records are not counted at all
+    if (countEcosysStatus(d.trang_thai_txt) === 'draft') return;       // drafts are not listed
+    const decls = String(d.export_declaration_number || '').split(',').map(s => normDigits(s)).filter(Boolean);
+    const set = new Set();
+    decls.forEach(n => {
+      const s = declToEcis.get(n);
+      if (s) s.forEach(e => set.add(e));
+    });
+    if (set.size === 0) { docsSkipped++; return; }                     // no ECIS found: not listed
+    const day = String(d.ngay_khai_co || '').slice(0, 10);
+    docsRecords.push({
+      id: d.id,
+      sotn: d.so_tiep_nhan,
+      co: d.so_hieu_cap_phep_co,
+      form: normMauCo(d.form_txt),
+      decls: decls,
+      ecis: [...set].sort(),
+      ngay: d.ngay_khai_co || '',
+      checked: day !== '' && day >= DOCS_CHECK_FROM,
+      eval: null,
+      view: null
+    });
+  });
+  docsRecords.sort((a, b) => String(b.ngay).localeCompare(String(a.ngay)) || String(b.sotn).localeCompare(String(a.sotn)));
+
+  // documents are needed only for the records that are checked
+  docsByItem = new Map();
+  const ids = docsRecords.filter(r => r.checked).map(r => r.id);
+  for (let i = 0; i < ids.length; i += 40) {
+    const chunk = ids.slice(i, i + 40);
+    const rows = await fetchAllRows(() => supabaseClient
+      .from('ecosys_docs')
+      .select('id, item_id, ten_tai_lieu, loai_tai_lieu, created_date, ngay_xoa_file')
+      .in('item_id', chunk)
+      .order('id', { ascending: true }));
+    rows.forEach(r => {
+      if (!docsByItem.has(r.item_id)) docsByItem.set(r.item_id, []);
+      docsByItem.get(r.item_id).push(r);
+    });
+  }
+  docsRecords.forEach(r => {
+    if (r.checked) r.eval = docsEvaluate(r, docsByItem.get(r.id) || []);
+  });
+}
+
+// Entering the mode loads (or refreshes after 60 s) the data; searching / paging only redraw
+async function ecosysDocsLoad(reset) {
+  if (reset) ecosysDocsPage = 1;
+  const body = document.getElementById('ecosys-docs-body');
+  const fresh = docsLoadedAt > 0 && (Date.now() - docsLoadedAt) < 60000;
+  if (!fresh) {
+    if (docsLoading) return;
+    docsLoading = true;
+    body.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 font-medium">Loading documents...</td></tr>';
+    try {
+      await docsFetchAll();
+      docsLoadedAt = Date.now();
+    } catch (e) {
+      body.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-600 font-medium">${ecoEsc(e.message || e)}</td></tr>`;
+      docsLoading = false;
+      return;
+    }
+    docsLoading = false;
+  }
+  ecosysDocsApply(false);
+}
+
+function ecosysDocsToggleIssues() {
+  docsOnlyIssues = !docsOnlyIssues;
+  const b = document.getElementById('ecosys-docs-issues-btn');
+  if (b) {
+    b.className = DOCS_BTN_BASE + ' ' + (docsOnlyIssues
+      ? 'bg-sidebar-main text-white border-transparent'
+      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50');
+  }
+  ecosysDocsApply(true);
+}
+
+// Understands several values in one box: ECIS numbers, full C/O numbers (they contain a space) and plain text
+function docsParseTerms(raw) {
+  let s = String(raw || '');
+  const terms = [];
+  s = s.replace(/ECIS\d+/gi, (m) => { terms.push(m.toLowerCase()); return ' '; });
+  s = s.replace(/\b([A-Z]{2}-[A-Z]{2,4})\s*(\d{2}\/\d{2}\/\d+)/gi, (m, a, b) => { terms.push((a + ' ' + b).toLowerCase()); return ' '; });
+  s.split(/[\s,;]+/).forEach(t => {
+    t = t.trim().toLowerCase();
+    if (t) terms.push(t);
+  });
+  return terms;
+}
+
+function docsFiltered() {
+  const raw = (document.getElementById('ecosys-docs-search').value || '');
+  const terms = docsParseTerms(raw);
+  return docsRecords.filter(r => {
+    if (docsOnlyIssues && !(r.checked && r.eval && !r.eval.ok)) return false;
+    if (terms.length === 0) return true;
+    const hay = r.ecis.map(e => e.toLowerCase()).concat([String(r.co || '').toLowerCase().replace(/\s+/g, ' ')]);
+    return terms.some(t => hay.some(h => h.includes(t)));
+  });
+}
+
+function docsCellHtml(rec) {
+  if (!rec.checked) {
+    return '<span class="inline-block px-2.5 py-1 rounded-md bg-slate-100 text-slate-400 font-medium">Not checked</span>';
+  }
+  const ev = rec.eval;
+  if (ev.ok) {
+    return `<span class="inline-block px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">&#10003; ${ecoEsc(ev.parts.join(' · '))}</span>`;
+  }
+  const txt = ev.parts.length ? ev.parts.join(' · ') : ev.missing[0].reason;
+  return `<span class="inline-block px-2.5 py-1 rounded-md bg-red-50 text-red-700 border border-red-200 font-semibold">&#10007; ${ecoEsc(txt)}</span>`;
+}
+
+// Draw the list from memory (search / filter / page)
+function ecosysDocsApply(reset) {
+  if (reset) ecosysDocsPage = 1;
+  const body = document.getElementById('ecosys-docs-body');
+  const info = document.getElementById('ecosys-docs-info');
+  const note = document.getElementById('ecosys-docs-note');
+  const issuesInfo = document.getElementById('ecosys-docs-issues-info');
+  const list = docsFiltered();
+  const total = list.length;
+  const totalPages = Math.ceil(total / ECOSYS_DOCS_PER_PAGE) || 1;
+  if (ecosysDocsPage > totalPages) ecosysDocsPage = totalPages;
+  const from = (ecosysDocsPage - 1) * ECOSYS_DOCS_PER_PAGE;
+  const pageData = list.slice(from, from + ECOSYS_DOCS_PER_PAGE);
+  const cell = 'py-3 px-3 align-top whitespace-nowrap';
+
+  if (pageData.length === 0) {
+    body.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 font-medium">No records found.</td></tr>';
+  } else {
+    body.innerHTML = pageData.map((r, i) => `
+      <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+        <td class="${cell} font-medium text-slate-400">${from + i + 1}</td>
+        <td class="${cell} font-semibold text-slate-800">${ecoEsc(r.sotn || '---')}</td>
+        <td class="${cell} font-bold text-blue-600">${ecoEsc(r.co || '---')}</td>
+        <td class="${cell} font-medium">${ecoEsc(r.form)}</td>
+        <td class="${cell} font-medium text-slate-700">${ecoEsc(r.ecis.join(', '))}</td>
+        <td class="py-3 px-3 align-top">${docsCellHtml(r)}</td>
+        <td class="${cell}"><button onclick="ecosysDocsOpen('${r.id}')" class="px-2.5 py-1 rounded-md border border-slate-300 bg-white text-slate-600 font-semibold hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition">Detail</button></td>
+      </tr>`).join('');
+  }
+
+  const checked = docsRecords.filter(r => r.checked);
+  const issues = checked.filter(r => r.eval && !r.eval.ok).length;
+  issuesInfo.innerText = `Issues: ${issues} / ${checked.length} checked`;
+  info.innerText = total === 0 ? '0 records' : `Showing ${from + 1} - ${from + pageData.length} of ${total} records`;
+  note.innerText = (docsSkipped ? `${docsSkipped} ${docsSkipped === 1 ? 'record is' : 'records are'} not listed (no ECIS found for its declaration numbers). ` : '')
+    + `Records filed before ${DOCS_CHECK_FROM.split('-').reverse().join('/')} are not checked.`;
+  renderPager('ecosys-docs-pagination', ecosysDocsPage, totalPages, 'changeEcosysDocsPage');
+}
+
+function changeEcosysDocsPage(page) {
+  const totalPages = Math.ceil(docsFiltered().length / ECOSYS_DOCS_PER_PAGE) || 1;
+  if (page < 1 || page > totalPages) return;
+  ecosysDocsPage = page;
+  ecosysDocsApply(false);
+}
+
+// ---------- popup ----------
+function ecosysDocsEnsurePopup() {
+  if (document.getElementById('ecosys-docs-popup')) return;
+  const el = document.createElement('div');
+  el.id = 'ecosys-docs-popup';
+  el.className = 'fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-[60]';
+  el.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="flex items-center gap-3 px-6 py-4 bg-sidebar-main">
+        <div class="bg-white p-1.5 rounded-lg shadow-sm flex items-center justify-center shrink-0">
+          <img src="logo/logo-uni.png" alt="UNI Logo" class="h-12 w-auto object-contain" onerror="this.style.display='none'">
+        </div>
+        <div class="min-w-0 flex-1">
+          <div id="ecosys-docs-popup-title" class="font-bold text-white text-lg truncate"></div>
+          <div id="ecosys-docs-popup-sub" class="text-xs text-blue-100 truncate"></div>
+        </div>
+        <button onclick="ecosysDocsClosePopup()" class="text-white/80 hover:text-white text-2xl leading-none px-2" aria-label="Close">&times;</button>
+      </div>
+      <div id="ecosys-docs-popup-body" class="p-5 overflow-y-auto"></div>
+    </div>`;
+  el.addEventListener('click', (e) => { if (e.target === el) ecosysDocsClosePopup(); });
+  document.body.appendChild(el);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') ecosysDocsClosePopup(); });
+}
+
+function ecosysDocsClosePopup() {
+  docsOpenId = null;
+  const el = document.getElementById('ecosys-docs-popup');
+  if (!el) return;
+  el.classList.add('hidden');
+  el.classList.remove('flex');
+}
+
+async function ecosysDocsOpen(id) {
+  const rec = docsRecords.find(r => r.id === id);
+  if (!rec) return;
+  ecosysDocsEnsurePopup();
+  docsOpenId = id;
+  document.getElementById('ecosys-docs-popup-title').textContent = `${rec.ecis.join(', ')}  ·  C/O No. ${rec.co || '---'}`;
+  document.getElementById('ecosys-docs-popup-sub').textContent = `Form ${rec.form}`;
+  document.getElementById('ecosys-docs-popup-body').innerHTML = '<div class="text-sm text-slate-400">Loading...</div>';
+  const el = document.getElementById('ecosys-docs-popup');
+  el.classList.remove('hidden');
+  el.classList.add('flex');
+
+  if (rec.checked) {
+    rec.view = rec.eval;
+  } else {
+    // not checked (filed before the start date): list the files only, no status
+    try {
+      const rows = await fetchAllRows(() => supabaseClient
+        .from('ecosys_docs')
+        .select('id, item_id, ten_tai_lieu, loai_tai_lieu, created_date, ngay_xoa_file')
+        .eq('item_id', id)
+        .order('id', { ascending: true }));
+      const ev = docsEvaluate(rec, rows);
+      ev.plain = true;
+      ev.missing = [];
+      ev.plxControl = false;
+      ev.files.forEach(f => { f.reason = null; });
+      rec.view = ev;
+    } catch (e) {
+      document.getElementById('ecosys-docs-popup-body').innerHTML = `<div class="text-sm text-red-600">Failed to load documents: ${ecoEsc(e.message || e)}</div>`;
+      return;
+    }
+    if (docsOpenId !== id) return;
+  }
+  ecosysDocsRenderPopup(rec);
+}
+
+function ecosysDocsRenderPopup(rec) {
+  const ev = rec.view;
+  const body = document.getElementById('ecosys-docs-popup-body');
+  if (!ev || !body) return;
+  const issues = ev.files.filter(f => f.reason).length + ev.missing.length;
+
+  let pill;
+  if (ev.plain) pill = '<span class="inline-block px-2.5 py-1 rounded-md bg-slate-100 text-slate-500 text-sm font-medium">Not checked</span>';
+  else if (ev.ok) pill = '<span class="inline-block px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-semibold">&#10003; All documents OK</span>';
+  else pill = `<span class="inline-block px-2.5 py-1 rounded-md bg-red-50 text-red-700 border border-red-200 text-sm font-semibold">&#10007; ${issues} issue(s)</span>`;
+
+  const statusHtml = (f) => {
+    if (ev.plain) return '<span class="text-slate-400">&mdash;</span>';
+    if (!f.reason) return '<span class="text-emerald-600 font-bold">&#10003;</span>';
+    return `<span class="text-red-600 font-bold">&#10007;</span> <span class="text-red-600">${ecoEsc(f.reason)}</span>`;
+  };
+  const td = 'py-2 px-3 align-top';
+  const fileRows = ev.files.map(f => `
+    <tr class="border-b border-slate-100">
+      <td class="${td} break-all">${ecoEsc(f.name || '---')}</td>
+      <td class="${td} whitespace-nowrap">${ecoEsc(f.label)}</td>
+      <td class="${td}">${statusHtml(f)}</td>
+    </tr>`).join('');
+  const missingRows = ev.missing.map(m => `
+    <tr class="border-b border-slate-100">
+      <td class="${td} italic text-slate-400">(missing)</td>
+      <td class="${td} whitespace-nowrap">${ecoEsc(m.label)}</td>
+      <td class="${td}"><span class="text-red-600 font-bold">&#10007;</span> <span class="text-red-600">${ecoEsc(m.reason)}</span></td>
+    </tr>`).join('');
+
+  let plxHtml = '';
+  if (ev.plxControl) {
+    const key = rec.ecis[0];
+    const flag = docsPlxFlags.get(key.toUpperCase());
+    const btn = (val, text) => `<button onclick="ecosysDocsSetPlx('${key}', ${val})" class="px-4 py-1.5 rounded-lg border text-sm font-semibold transition ${flag === val ? 'bg-sidebar-main text-white border-transparent' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">${text}</button>`;
+    plxHtml = `
+      <div class="mt-4 p-3 rounded-lg border border-slate-200 bg-slate-50 flex flex-wrap items-center gap-3">
+        <span class="text-sm text-slate-700">No PLX file for <b>${ecoEsc(key)}</b>. Is a PLX needed?</span>
+        ${btn(true, 'Yes')}${btn(false, 'No')}
+        <span id="ecosys-docs-plx-msg" class="text-[11px] text-slate-400">Saved for every record of this ECIS.</span>
+      </div>`;
+  }
+
+  body.innerHTML = `
+    <div class="mb-3">${pill}</div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
+          <tr>
+            <th class="py-2 px-3">File name</th>
+            <th class="py-2 px-3 whitespace-nowrap">Document type</th>
+            <th class="py-2 px-3">Status</th>
+          </tr>
+        </thead>
+        <tbody>${fileRows}${missingRows || ''}${(!fileRows && !missingRows) ? '<tr><td colspan="3" class="py-4 text-center text-slate-400">No documents.</td></tr>' : ''}</tbody>
+      </table>
+    </div>
+    ${plxHtml}`;
+}
+
+// Save the PLX Yes / No choice for an ECIS, then re-check every record
+async function ecosysDocsSetPlx(ecis, needed) {
+  const msg = document.getElementById('ecosys-docs-plx-msg');
+  if (msg) msg.innerText = 'Saving...';
+  const { error } = await supabaseClient
+    .from('ecosys_plx_flags')
+    .upsert({ ecis: ecis, plx_needed: needed, updated_at: new Date().toISOString() });
+  if (error) {
+    if (msg) {
+      msg.className = 'text-[11px] text-red-600';
+      msg.innerText = 'Could not save: ' + error.message;
+    }
+    return;
+  }
+  docsPlxFlags.set(ecis.toUpperCase(), needed);
+  docsRecords.forEach(r => {
+    if (r.checked) r.eval = docsEvaluate(r, docsByItem.get(r.id) || []);
+  });
+  ecosysDocsApply(false);
+  const rec = docsRecords.find(r => r.id === docsOpenId);
+  if (rec) {
+    rec.view = rec.eval;
+    ecosysDocsRenderPopup(rec);
+  }
+}
+
+    // ---------------- ECOSYS: CLICKABLE KPI CARDS + REJECTION REASON ----------------
+    // Reason of the latest rejection of each record (receipt no. -> note)
+    async function loadEcosysRejectionReasons() {
+      try {
+        const rows = await fetchAllRows(() => supabaseClient
+          .from('ecosys_rejections')
+          .select('so_tiep_nhan, hanh_dong, ghi_chu, ngay_xu_ly')
+          .order('ngay_xu_ly', { ascending: false, nullsFirst: false })
+          .order('id', { ascending: true }));
+        const m = new Map();
+        const isRejectAction = (r) => String(r.hanh_dong || '').toLowerCase().includes('t\u1eeb ch\u1ed1i');
+        // real "reject" actions first (newest first), then any other row as a fallback
+        rows.filter(isRejectAction).forEach(r => {
+          if (r.so_tiep_nhan && !m.has(r.so_tiep_nhan)) m.set(r.so_tiep_nhan, (r.ghi_chu || '').trim());
+        });
+        rows.forEach(r => {
+          if (r.so_tiep_nhan && !m.has(r.so_tiep_nhan)) m.set(r.so_tiep_nhan, (r.ghi_chu || '').trim());
+        });
+        ecosysReasons = m;
+      } catch (e) {
+        console.error('Rejection reasons error:', e.message);
+        ecosysReasons = new Map();
+      }
     }
 
-    function changeEcosysDocsPage(page) {
-      const totalPages = Math.ceil(ecosysDocsTotal / ECOSYS_DOCS_PER_PAGE) || 1;
-      if (page < 1 || page > totalPages) return;
-      ecosysDocsPage = page;
-      ecosysDocsLoad(false);
+    // Reason cell: only exists while the "rejected" card filter is on
+    function ecosysReasonCell(item) {
+      if (ecosysKpiFilter !== 'rejected') return '';
+      const reason = ecosysReasons.get(item.so_tiep_nhan);
+      return `<td class="py-3 px-3 align-top min-w-[240px] max-w-sm whitespace-pre-line break-words text-red-700">${reason ? ecoEsc(reason) : '---'}</td>`;
     }
+
+    function ecosysColSpan() {
+      return ecosysKpiFilter === 'rejected' ? 13 : 12;
+    }
+
+    // Highlight the active card and show/hide the reason column
+    function ecosysUpdateKpiUi() {
+      const active = ecosysKpiFilter || 'total';
+      document.querySelectorAll('[data-kpi]').forEach(card => {
+        const on = card.dataset.kpi === active;
+        ['ring-2', 'ring-offset-2', 'ring-blue-500'].forEach(c => card.classList.toggle(c, on));
+      });
+      const th = document.getElementById('ecosys-th-reason');
+      if (th) th.classList.toggle('hidden', ecosysKpiFilter !== 'rejected');
+    }
+
+    // Click a card = filter; click the same card again (or the total card) = show everything
+    function ecosysSetKpiFilter(key) {
+      ecosysKpiFilter = (key === 'total' || key === ecosysKpiFilter) ? null : key;
+      ecosysUpdateKpiUi();
+      applyEcosysFilter();
+    }
+
+    function ecosysInitKpiCards() {
+      const ids = {
+        total: 'ecostat-total',
+        draft: 'ecostat-draft',
+        approved: 'ecostat-approved',
+        gddn: 'ecostat-gddn',
+        pending: 'ecostat-pending',
+        rejected: 'ecostat-rejected'
+      };
+      Object.keys(ids).forEach(key => {
+        const num = document.getElementById(ids[key]);
+        const card = num ? num.parentElement : null;
+        if (!card) return;
+        card.dataset.kpi = key;
+        card.title = 'Click to filter';
+        card.classList.add('cursor-pointer', 'select-none', 'transition', 'hover:shadow-md', 'active:scale-95');
+        card.addEventListener('click', () => ecosysSetKpiFilter(key));
+      });
+      ecosysUpdateKpiUi();
+    }
+    ecosysInitKpiCards();
 
     async function fetchEcosysData() {
       let data;
@@ -2541,6 +3171,7 @@
 
       ecosysData = data || [];
       await loadEcosysDetailIndex();
+      await loadEcosysRejectionReasons();
 
       // Map số tờ khai -> tập số C/O (TÁCH nhiều số trong 1 ô)
       ecosysByToKhai = new Map();
@@ -2567,7 +3198,7 @@
       const tbody = document.getElementById('ecosys-table-body');
       if (!ecosysView || ecosysView.length === 0) {
         const msg = (ecosysData && ecosysData.length) ? 'Không có hồ sơ khớp tìm kiếm.' : 'Chưa có dữ liệu ECOSYS trong hệ thống.';
-        tbody.innerHTML = `<tr><td colspan="12" class="text-center py-8 text-slate-400 font-medium">${msg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${ecosysColSpan()}" class="text-center py-8 text-slate-400 font-medium">${msg}</td></tr>`;
         renderEcosysPagination();
         return;
       }
@@ -2590,6 +3221,7 @@
           <td class="${cell}">${formatDate(item.ngay_duyet)}</td>
           <td class="${cell}">${formatDate(item.ngay_cap_phe_duyet)}</td>
           <td class="${cell} font-medium text-slate-700">${item.doanh_nghiep_ky || '---'}</td>
+          ${ecosysReasonCell(item)}
           <td class="${cell}">${ecosysDetailKeys.has(item.so_tiep_nhan)
             ? `<button onclick="ecosysShowDetail('${item.so_tiep_nhan}', 'so_tiep_nhan')" class="px-2.5 py-1 rounded-md border border-slate-300 bg-white text-slate-600 font-semibold hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition">Detail</button>`
             : '<span class="text-slate-300">---</span>'}</td>
