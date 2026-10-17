@@ -589,6 +589,66 @@
             </button>
           </div>
 
+          <!-- MODE SWITCH: Data ECOSYS / Data detail / Docs detail -->
+          <div id="ecosys-mode-switch" class="inline-flex items-center gap-1 p-1 mb-5 rounded-xl bg-slate-100 border border-slate-200">
+            <button id="ecosys-mode-btn-data" onclick="ecosysSetMode('data')"
+              class="px-4 py-1.5 rounded-lg text-sm font-semibold transition bg-sidebar-main text-white shadow-sm">Data ECOSYS</button>
+            <button id="ecosys-mode-btn-detail" onclick="ecosysSetMode('detail')"
+              class="px-4 py-1.5 rounded-lg text-sm font-semibold transition text-slate-600 hover:bg-white">Data detail</button>
+            <button id="ecosys-mode-btn-docs" onclick="ecosysSetMode('docs')"
+              class="px-4 py-1.5 rounded-lg text-sm font-semibold transition text-slate-600 hover:bg-white">Docs detail</button>
+          </div>
+
+          <!-- DATA DETAIL: look up by declaration number -->
+          <div id="ecosys-mode-detail" class="hidden">
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+              <input id="ecosys-detail-input" type="text" inputmode="numeric"
+                placeholder="Enter a customs declaration number..."
+                onkeydown="if (event.key === 'Enter') ecosysDetailSearch()"
+                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-80 focus:outline-none focus:ring-2 focus:ring-blue-300">
+              <button onclick="ecosysDetailSearch()"
+                class="bg-sidebar-main hover:opacity-90 active:scale-95 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Search</button>
+              <span class="text-xs text-slate-400">Cancelled records are not included.</span>
+            </div>
+            <div id="ecosys-detail-chooser" class="mb-4"></div>
+            <div id="ecosys-detail-view">
+              <div class="text-sm text-slate-400">Enter a declaration number above, or click Detail on a record in Data ECOSYS.</div>
+            </div>
+          </div>
+
+          <!-- DOCS DETAIL: document log of all records -->
+          <div id="ecosys-mode-docs" class="hidden">
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+              <input id="ecosys-docs-search" type="text"
+                placeholder="Search file name, receipt no. or document type..."
+                onkeydown="if (event.key === 'Enter') ecosysDocsLoad(true)"
+                class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-96 focus:outline-none focus:ring-2 focus:ring-blue-300">
+              <button onclick="ecosysDocsLoad(true)"
+                class="bg-sidebar-main hover:opacity-90 active:scale-95 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Search</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[1000px] text-left border-collapse text-xs">
+                <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200 whitespace-nowrap">
+                  <tr>
+                    <th class="py-3 px-3">No.</th>
+                    <th class="py-3 px-3">Receipt No.</th>
+                    <th class="py-3 px-3">File name</th>
+                    <th class="py-3 px-3">Document type</th>
+                    <th class="py-3 px-3">Size</th>
+                    <th class="py-3 px-3">Uploaded</th>
+                    <th class="py-3 px-3">Deleted</th>
+                    <th class="py-3 px-3">Detail</th>
+                  </tr>
+                </thead>
+                <tbody id="ecosys-docs-body" class="divide-y divide-slate-100 text-slate-700"></tbody>
+              </table>
+            </div>
+            <div class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span id="ecosys-docs-info" class="text-xs text-slate-500 font-medium">0 documents</span>
+              <div id="ecosys-docs-pagination" class="flex items-center gap-1.5 flex-wrap"></div>
+            </div>
+          </div>
+
           <!-- THỐNG KÊ + TÌM KIẾM ECOSYS -->
           <div class="mb-5 space-y-3">
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -641,6 +701,7 @@
                   <th class="py-3 px-3">Ngày Duyệt</th>
                   <th class="py-3 px-3">Ngày Cấp Phép</th>
                   <th class="py-3 px-3">Doanh Nghiệp Ký</th>
+                  <th class="py-3 px-3">Detail</th>
                 </tr>
               </thead>
               <tbody id="ecosys-table-body" class="divide-y divide-slate-100 text-slate-700">
@@ -844,6 +905,13 @@
     let sortDir = 'desc';
     let chartYear = new Date().getFullYear();
     const ecosysPerPage = 30;
+
+    // Detail / Docs modes of the ECOSYS tab
+    let ecosysMode = 'data';
+    let ecosysDetailKeys = new Set();   // receipt numbers that have a stored detail row
+    let ecosysDocsPage = 1;
+    let ecosysDocsTotal = 0;
+    let ecosysDocsReq = 0;              // request counter, so an old answer never overwrites a newer one
 
     function normDigits(s) {
       return (s == null ? '' : String(s)).replace(/\D/g, '');
@@ -2112,6 +2180,352 @@
       renderEcosys();
     }
 
+    // ---------------- ECOSYS: DATA DETAIL / DOCS DETAIL MODES ----------------
+    const ECOSYS_MODE_BASE = 'px-4 py-1.5 rounded-lg text-sm font-semibold transition';
+    const ECOSYS_MODE_ON = 'bg-sidebar-main text-white shadow-sm';
+    const ECOSYS_MODE_OFF = 'text-slate-600 hover:bg-white';
+    const ECOSYS_CANCEL_WORD = 'h\u1ee7y';   // text that marks a cancelled record (matched on the lower-cased status)
+    const ECOSYS_DOCS_PER_PAGE = 30;
+
+    // Label of each stored detail column (columns not listed here are still shown with their raw name)
+    const ECOSYS_DETAIL_LABELS = [
+      ['so_tiep_nhan', 'Receipt No.'],
+      ['so_hieu_cap_phep_co', 'C/O No.'],
+      ['trang_thai_txt', 'Status'],
+      ['form_txt', 'Form'],
+      ['importing_country', 'Importing country'],
+      ['tax_code', 'Tax code'],
+      ['issuing_authority', 'Issuing authority'],
+      ['export_declaration_number', 'Declaration No.'],
+      ['export_declaration_date', 'Declaration date'],
+      ['goods_total_fob_value', 'Total FOB value'],
+      ['goods_total_quantity', 'Total quantity'],
+      ['exporter_name', 'Exporter'],
+      ['from_address_line1', 'Exporter address 1'],
+      ['from_address_line2', 'Exporter address 2'],
+      ['consignee_name', 'Consignee'],
+      ['to_address_line1', 'Consignee address 1'],
+      ['to_address_line2', 'Consignee address 2'],
+      ['transportation_type', 'Transport type'],
+      ['port_of_loading', 'Port of loading'],
+      ['port_of_discharge', 'Port of discharge'],
+      ['transport_name', 'Vessel / transport'],
+      ['bill', 'Bill No.'],
+      ['departure_date', 'Departure date'],
+      ['ngay_khai_co', 'Filed on'],
+      ['ngay_cap_so_co', 'C/O number issued on'],
+      ['cv_ngay_duyet_dien_tu', 'E-approval date'],
+      ['cv_ngay_cap_phep_co', 'C/O issued on'],
+      ['cv_nguoi_duyet_dien_tu', 'Approved by'],
+      ['manu_name', 'Manufacturer'],
+      ['manu_address_line1', 'Manufacturer address 1'],
+      ['manu_address_line2', 'Manufacturer address 2'],
+      ['declaration_place', 'Declaration place'],
+      ['is_nop_phi', 'Fee paid'],
+      ['goods_is_show_fob_value', 'Show FOB value'],
+      ['data_json', 'Extra data (JSON)'],
+      ['remarks', 'Remarks']
+    ];
+    const ECOSYS_DETAIL_DATE_KEYS = new Set(['departure_date', 'ngay_khai_co', 'ngay_cap_so_co', 'cv_ngay_duyet_dien_tu', 'cv_ngay_cap_phep_co']);
+
+    function ecoEsc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function ecoFmtTime(v) {
+      if (!v) return '---';
+      const t = new Date(v);
+      return isNaN(t) ? '---' : t.toLocaleString('vi-VN');
+    }
+
+    // The portal reports the size in KB
+    function ecoFmtSize(kb) {
+      if (kb === null || kb === undefined || kb === '') return '---';
+      const n = Number(kb);
+      if (isNaN(n)) return '---';
+      return n >= 1024 ? (n / 1024).toFixed(1) + ' MB' : n + ' KB';
+    }
+
+    // Which receipt numbers have detail data (decides where the Detail button appears)
+    async function loadEcosysDetailIndex() {
+      try {
+        const rows = await fetchAllRows(() => supabaseClient
+          .from('ecosys_detail')
+          .select('so_tiep_nhan')
+          .order('id', { ascending: true }));
+        ecosysDetailKeys = new Set(rows.map(r => r.so_tiep_nhan).filter(Boolean));
+      } catch (e) {
+        console.error('Detail index error:', e.message);
+        ecosysDetailKeys = new Set();
+      }
+    }
+
+    function ecosysSetMode(mode) {
+      ecosysMode = mode;
+      // The three existing Data ECOSYS blocks (KPI + search, table, pagination)
+      const dataBlocks = [
+        document.getElementById('ecostat-total').closest('.mb-5'),
+        document.getElementById('ecosys-table-body').closest('.overflow-x-auto'),
+        document.getElementById('ecosys-page-info').parentElement
+      ];
+      dataBlocks.forEach(el => { if (el) el.classList.toggle('hidden', mode !== 'data'); });
+      document.getElementById('ecosys-mode-detail').classList.toggle('hidden', mode !== 'detail');
+      document.getElementById('ecosys-mode-docs').classList.toggle('hidden', mode !== 'docs');
+      ['data', 'detail', 'docs'].forEach(m => {
+        const b = document.getElementById('ecosys-mode-btn-' + m);
+        if (b) b.className = ECOSYS_MODE_BASE + ' ' + (m === mode ? ECOSYS_MODE_ON : ECOSYS_MODE_OFF);
+      });
+      if (mode === 'docs') ecosysDocsLoad(false);
+    }
+
+    // ---- Data detail: look up by declaration number ----
+    async function ecosysDetailSearch() {
+      const chooser = document.getElementById('ecosys-detail-chooser');
+      const view = document.getElementById('ecosys-detail-view');
+      const raw = document.getElementById('ecosys-detail-input').value || '';
+      const digits = (raw.match(/\d{6,}/) || [''])[0];
+      chooser.innerHTML = '';
+      if (!digits) {
+        view.innerHTML = '<div class="text-sm text-amber-600">Enter at least 6 digits of a declaration number.</div>';
+        return;
+      }
+      view.innerHTML = '<div class="text-sm text-slate-400">Searching...</div>';
+
+      const { data, error } = await supabaseClient
+        .from('ecosys_detail')
+        .select('id, so_tiep_nhan, so_hieu_cap_phep_co, trang_thai_txt, ngay_khai_co')
+        .ilike('export_declaration_number', '%' + digits + '%')
+        .order('ngay_khai_co', { ascending: false, nullsFirst: false })
+        .limit(50);
+      if (error) {
+        view.innerHTML = `<div class="text-sm text-red-600">Search failed: ${ecoEsc(error.message)}</div>`;
+        return;
+      }
+
+      const all = data || [];
+      const rows = all.filter(r => !String(r.trang_thai_txt || '').toLowerCase().includes(ECOSYS_CANCEL_WORD));
+      const hidden = all.length - rows.length;
+
+      if (rows.length === 0) {
+        view.innerHTML = `<div class="text-sm text-slate-500">No record found for this declaration number.${hidden ? ' (' + hidden + ' cancelled record(s) hidden)' : ''}</div>`;
+        return;
+      }
+      if (rows.length === 1) {
+        await ecosysShowDetail(rows[0].id);
+        return;
+      }
+
+      // The same declaration number belongs to several records: let the user choose one
+      view.innerHTML = '';
+      chooser.innerHTML = `
+        <div class="mb-2 text-sm text-slate-600">This declaration number belongs to <b>${rows.length}</b> records. Choose one:</div>
+        <div class="flex flex-wrap gap-2">
+          ${rows.map(r => `
+            <button onclick="ecosysShowDetail('${r.id}', 'id', true)"
+              class="text-left px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-blue-50 hover:border-blue-300 transition">
+              <div class="text-sm font-bold text-slate-800">${ecoEsc(r.so_tiep_nhan || '---')}</div>
+              <div class="text-xs text-blue-600 font-semibold">${ecoEsc(r.so_hieu_cap_phep_co || '---')}</div>
+              <div class="mt-1">${ecosysStatusBadge(r.trang_thai_txt)}</div>
+            </button>`).join('')}
+        </div>`;
+    }
+
+    // Open one record. field = 'id' (default) or 'so_tiep_nhan'. keepChooser = keep the choice buttons visible.
+    async function ecosysShowDetail(key, field, keepChooser) {
+      field = field || 'id';
+      ecosysSetMode('detail');
+      if (!keepChooser) document.getElementById('ecosys-detail-chooser').innerHTML = '';
+      const view = document.getElementById('ecosys-detail-view');
+      view.innerHTML = '<div class="text-sm text-slate-400">Loading detail...</div>';
+      document.getElementById('ecosys-mode-switch').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try {
+        const dRes = await supabaseClient.from('ecosys_detail').select('*').eq(field, key).limit(1);
+        if (dRes.error) throw dRes.error;
+        const d = (dRes.data || [])[0];
+        if (!d) {
+          view.innerHTML = '<div class="text-sm text-slate-500">No detail data for this record yet.</div>';
+          return;
+        }
+        const [gRes, docRes, rejRes] = await Promise.all([
+          supabaseClient.from('ecosys_goods').select('*').eq('item_id', d.id).order('line_no', { ascending: true }),
+          supabaseClient.from('ecosys_docs').select('*').eq('item_id', d.id).order('created_date', { ascending: true }),
+          supabaseClient.from('ecosys_rejections').select('*').eq('item_id', d.id).order('ngay_xu_ly', { ascending: false })
+        ]);
+        if (gRes.error) throw gRes.error;
+        if (docRes.error) throw docRes.error;
+        if (rejRes.error) throw rejRes.error;
+        ecosysRenderDetail(d, gRes.data || [], docRes.data || [], rejRes.data || []);
+      } catch (e) {
+        view.innerHTML = `<div class="text-sm text-red-600">Failed to load detail: ${ecoEsc(e.message || e)}</div>`;
+      }
+    }
+
+    // Temporary layout: everything that is stored, readable. The final layout will be arranged later.
+    function ecosysRenderDetail(d, goods, docs, rejections) {
+      const view = document.getElementById('ecosys-detail-view');
+      const skip = new Set(['id', 'sig', 'fetched_at']);
+      const known = new Set(ECOSYS_DETAIL_LABELS.map(p => p[0]));
+      const fmt = (k, v) => {
+        if (v === null || v === undefined || v === '') return '---';
+        if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+        if (ECOSYS_DETAIL_DATE_KEYS.has(k)) return ecoEsc(ecoFmtTime(v));
+        return ecoEsc(v);
+      };
+      const fields = ECOSYS_DETAIL_LABELS.filter(p => p[0] in d)
+        .concat(Object.keys(d).filter(k => !known.has(k) && !skip.has(k)).map(k => [k, k]));
+
+      const kv = fields.map(p => `
+        <div>
+          <div class="text-[10px] uppercase tracking-wide text-slate-400">${ecoEsc(p[1])}</div>
+          <div class="text-sm text-slate-800 break-words">${fmt(p[0], d[p[0]])}</div>
+        </div>`).join('');
+
+      const th = 'py-2 px-3 whitespace-nowrap';
+      const td = 'py-2 px-3 align-top';
+
+      const goodsRows = goods.map(g => `
+        <tr class="border-b border-slate-100">
+          <td class="${td} text-slate-400">${g.line_no ?? ''}</td>
+          <td class="${td} font-mono whitespace-nowrap">${ecoEsc(g.exporting_hs_code || '---')}</td>
+          <td class="${td}">${ecoEsc(g.goods_description || '---')}</td>
+          <td class="${td} whitespace-nowrap">${g.quantity ?? '---'} ${ecoEsc(g.quantity_unit_txt || '')}</td>
+          <td class="${td} whitespace-nowrap">${g.amount ?? '---'} ${ecoEsc(g.currency || '')}</td>
+          <td class="${td} whitespace-nowrap">${ecoEsc(g.invoice_number || '---')}</td>
+          <td class="${td} whitespace-nowrap">${ecoEsc(g.origin_criterion || '---')}</td>
+        </tr>`).join('');
+
+      const docRows = docs.map(x => `
+        <tr class="border-b border-slate-100">
+          <td class="${td} whitespace-nowrap">${ecoFmtTime(x.created_date)}</td>
+          <td class="${td} text-blue-600 font-medium">${ecoEsc(x.ten_tai_lieu || '---')}</td>
+          <td class="${td}">${ecoEsc(x.loai_tai_lieu_txt || x.loai_tai_lieu || '---')}</td>
+          <td class="${td} whitespace-nowrap">${ecoFmtSize(x.kich_thuoc)}</td>
+          <td class="${td} whitespace-nowrap">${x.ngay_xoa_file ? ecoFmtTime(x.ngay_xoa_file) : '---'}</td>
+        </tr>`).join('');
+
+      const rejHtml = rejections.length === 0 ? '' : `
+        <div class="mb-6">
+          <h3 class="text-sm font-bold text-red-700 mb-2">Rejections (${rejections.length})</h3>
+          <div class="space-y-2">
+            ${rejections.map(r => `
+              <div class="rounded-lg border border-red-200 bg-red-50 p-3">
+                <div class="text-xs text-red-700 font-semibold">${ecoFmtTime(r.ngay_xu_ly)} · ${ecoEsc(r.nguoi_xu_ly || '---')} · ${ecoEsc(r.hanh_dong || '---')}</div>
+                <div class="mt-1 text-sm text-red-900 whitespace-pre-line">${ecoEsc(r.ghi_chu || '---')}</div>
+              </div>`).join('')}
+          </div>
+        </div>`;
+
+      view.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-200">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-lg font-bold text-slate-800">${ecoEsc(d.so_tiep_nhan || '---')}</span>
+            <span class="font-bold text-blue-600">${ecoEsc(d.so_hieu_cap_phep_co || '---')}</span>
+            ${ecosysStatusBadge(d.trang_thai_txt)}
+          </div>
+          <button onclick="ecosysSetMode('data')"
+            class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition">&larr; Back to Data ECOSYS</button>
+        </div>
+
+        ${rejHtml}
+
+        <div class="mb-6">
+          <h3 class="text-sm font-bold text-slate-700 mb-3">Detail</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-3">${kv}</div>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="text-sm font-bold text-slate-700 mb-2">Goods (${goods.length})</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
+                <tr>
+                  <th class="${th}">No.</th><th class="${th}">HS code</th><th class="${th}">Description</th>
+                  <th class="${th}">Quantity</th><th class="${th}">Value</th><th class="${th}">Invoice No.</th><th class="${th}">Origin criterion</th>
+                </tr>
+              </thead>
+              <tbody>${goodsRows || '<tr><td colspan="7" class="py-4 text-center text-slate-400">No goods lines.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <h3 class="text-sm font-bold text-slate-700 mb-2">Documents (${docs.length})</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
+                <tr>
+                  <th class="${th}">Uploaded</th><th class="${th}">File name</th><th class="${th}">Document type</th>
+                  <th class="${th}">Size</th><th class="${th}">Deleted</th>
+                </tr>
+              </thead>
+              <tbody>${docRows || '<tr><td colspan="5" class="py-4 text-center text-slate-400">No documents.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    // ---- Docs detail: document log of all records (server-side search and paging) ----
+    async function ecosysDocsLoad(reset) {
+      if (reset) ecosysDocsPage = 1;
+      const reqId = ++ecosysDocsReq;
+      const body = document.getElementById('ecosys-docs-body');
+      const info = document.getElementById('ecosys-docs-info');
+      const term = (document.getElementById('ecosys-docs-search').value || '').trim().replace(/[\\"]/g, '');
+      const from = (ecosysDocsPage - 1) * ECOSYS_DOCS_PER_PAGE;
+
+      body.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400 font-medium">Loading...</td></tr>';
+
+      let q = supabaseClient.from('ecosys_docs').select('*', { count: 'exact' });
+      if (term) {
+        const p = '"%' + term + '%"';
+        q = q.or(`ten_tai_lieu.ilike.${p},so_tiep_nhan.ilike.${p},loai_tai_lieu_txt.ilike.${p}`);
+      }
+      q = q.order('created_date', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true })
+        .range(from, from + ECOSYS_DOCS_PER_PAGE - 1);
+
+      const { data, error, count } = await q;
+      if (reqId !== ecosysDocsReq) return;   // a newer request has been made meanwhile
+
+      if (error) {
+        body.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-red-600 font-medium">Failed to load documents: ${ecoEsc(error.message)}</td></tr>`;
+        return;
+      }
+
+      ecosysDocsTotal = count || 0;
+      const rows = data || [];
+      const cell = 'py-3 px-3 align-top whitespace-nowrap';
+
+      if (rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400 font-medium">No documents found.</td></tr>';
+      } else {
+        body.innerHTML = rows.map((x, i) => `
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="${cell} font-medium text-slate-400">${from + i + 1}</td>
+            <td class="${cell} font-semibold text-slate-800">${ecoEsc(x.so_tiep_nhan || '---')}</td>
+            <td class="${cell} font-medium text-blue-600">${ecoEsc(x.ten_tai_lieu || '---')}</td>
+            <td class="${cell}">${ecoEsc(x.loai_tai_lieu_txt || x.loai_tai_lieu || '---')}</td>
+            <td class="${cell}">${ecoFmtSize(x.kich_thuoc)}</td>
+            <td class="${cell}">${ecoFmtTime(x.created_date)}</td>
+            <td class="${cell}">${x.ngay_xoa_file ? ecoFmtTime(x.ngay_xoa_file) : '---'}</td>
+            <td class="${cell}"><button onclick="ecosysShowDetail('${x.item_id}')" class="px-2.5 py-1 rounded-md border border-slate-300 bg-white text-slate-600 font-semibold hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition">Detail</button></td>
+          </tr>`).join('');
+      }
+
+      const totalPages = Math.ceil(ecosysDocsTotal / ECOSYS_DOCS_PER_PAGE) || 1;
+      info.innerText = ecosysDocsTotal === 0
+        ? '0 documents'
+        : `Showing ${from + 1} - ${from + rows.length} of ${ecosysDocsTotal} documents`;
+      renderPager('ecosys-docs-pagination', ecosysDocsPage, totalPages, 'changeEcosysDocsPage');
+    }
+
+    function changeEcosysDocsPage(page) {
+      const totalPages = Math.ceil(ecosysDocsTotal / ECOSYS_DOCS_PER_PAGE) || 1;
+      if (page < 1 || page > totalPages) return;
+      ecosysDocsPage = page;
+      ecosysDocsLoad(false);
+    }
+
     async function fetchEcosysData() {
       let data;
       try {
@@ -2126,6 +2540,7 @@
       }
 
       ecosysData = data || [];
+      await loadEcosysDetailIndex();
 
       // Map số tờ khai -> tập số C/O (TÁCH nhiều số trong 1 ô)
       ecosysByToKhai = new Map();
@@ -2152,7 +2567,7 @@
       const tbody = document.getElementById('ecosys-table-body');
       if (!ecosysView || ecosysView.length === 0) {
         const msg = (ecosysData && ecosysData.length) ? 'Không có hồ sơ khớp tìm kiếm.' : 'Chưa có dữ liệu ECOSYS trong hệ thống.';
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-slate-400 font-medium">${msg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="text-center py-8 text-slate-400 font-medium">${msg}</td></tr>`;
         renderEcosysPagination();
         return;
       }
@@ -2175,6 +2590,9 @@
           <td class="${cell}">${formatDate(item.ngay_duyet)}</td>
           <td class="${cell}">${formatDate(item.ngay_cap_phe_duyet)}</td>
           <td class="${cell} font-medium text-slate-700">${item.doanh_nghiep_ky || '---'}</td>
+          <td class="${cell}">${ecosysDetailKeys.has(item.so_tiep_nhan)
+            ? `<button onclick="ecosysShowDetail('${item.so_tiep_nhan}', 'so_tiep_nhan')" class="px-2.5 py-1 rounded-md border border-slate-300 bg-white text-slate-600 font-semibold hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition">Detail</button>`
+            : '<span class="text-slate-300">---</span>'}</td>
         </tr>
       `).join('');
 
