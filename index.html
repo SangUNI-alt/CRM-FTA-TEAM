@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LOGISTICS HUB - CO TRACKING & ECOSYS 2026</title>
   
-  <!-- Nhúng phông chữ Noto Serif từ Google Fonts -->
+  <!-- Embed Inter font from Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -42,21 +42,37 @@
       transform-origin: bottom; 
     }
     .bar-gradient:hover { fill: url(#barGradHover); filter: drop-shadow(0px 6px 6px rgba(38, 94, 155, 0.4)); cursor: pointer; }
+    /* ===== Stats typography: 5 sizes, 4 weights, 1 letter-spacing (scoped to the Stats section) ===== */
+    #section-statistical {
+      --fs-caption: 11px;   /* KPI labels, badges, month names, "In progress" */
+      --fs-small: 12px;     /* units, legend rows, bar values */
+      --fs-body: 14px;      /* year buttons, chart end label, detail text */
+      --fs-title: 16px;     /* card titles */
+      --fs-display: 28px;   /* KPI numbers, donut center */
+      --ls-caps: 0.04em;    /* every uppercase label */
+      --fw-title: 800;      /* page title, card titles, big numbers (set 700 for a lighter look) */
+    }
+    @media (min-width: 1536px) { #section-statistical { --fs-display: 30px; } }
+    #section-statistical h1 { font-weight: var(--fw-title); }
+    #section-statistical h2 { font-size: var(--fs-title); font-weight: 700; letter-spacing: var(--ls-caps); }
+
     /* Stats KPI row: 4 cards on one row, sizes scale with the screen (scoped to .kpi-grid, does not touch Tracking) */
     .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(0.5rem, 0.9vw, 1rem); margin-bottom: 1.5rem; }
-    .kpi-grid > div { min-width: 0; padding: clamp(0.75rem, 1vw, 1.25rem); gap: 0.5rem; }
-    .kpi-grid .uppercase { font-size: clamp(9px, 0.35vw + 5px, 11px); letter-spacing: 0.04em; }
-    .kpi-grid .text-3xl { font-size: clamp(1.25rem, 0.55rem + 1.2vw, 2rem); line-height: 1.15; }
-    .kpi-grid .text-xs { font-size: clamp(10px, 0.3vw + 6px, 12px); }
+    .kpi-grid > div { min-width: 0; padding: clamp(1rem, 1.3vw, 1.25rem); gap: 0.5rem; }
+    .kpi-grid .uppercase { font-size: var(--fs-caption); letter-spacing: var(--ls-caps); }
+    .kpi-grid .text-3xl { font-size: var(--fs-display); font-weight: var(--fw-title); line-height: 1.15; }
+    .kpi-grid .text-xs { font-size: var(--fs-small); }
+    .kpi-grid .rounded-full { font-size: var(--fs-caption); }
     .kpi-grid .flex.items-baseline { flex-wrap: wrap; column-gap: 0.4rem; row-gap: 0; }
-    .kpi-grid > div > div:last-child { width: clamp(2rem, 2.4vw, 3rem); height: clamp(2rem, 2.4vw, 3rem); }
+    .kpi-grid > div > div:last-child { width: clamp(2.5rem, 2.8vw, 3rem); height: clamp(2.5rem, 2.8vw, 3rem); }
     .kpi-grid > div > div:last-child svg { width: 55%; height: 55%; }
     @media (max-width: 1100px) { .kpi-grid > div > div:last-child { display: none; } }
     @media (max-width: 640px)  { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     
-    /* Áp dụng phông chữ Noto Serif cho toàn bộ trang */
+    /* Inter for the whole app: sans-serif, tabular (equal-width) digits, 4 weights only (400/500/600/700) */
     body {
-      font-family: 'Noto Serif', serif;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      font-variant-numeric: tabular-nums;
     }
 
     /* Tùy chỉnh gam màu Sidebar */
@@ -71,6 +87,34 @@
     }
     .border-sidebar-accent {
       border-color: #6EB1F9;
+    }
+
+    /* Selection popup: animated check / cross */
+    @keyframes selDrawCircle {
+      from { stroke-dashoffset: 166; }
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes selDrawTick {
+      from { stroke-dashoffset: 60; }
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes selPop {
+      0% { transform: scale(0.7); opacity: 0; }
+      60% { transform: scale(1.06); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .sel-done-circle {
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      animation: selDrawCircle 0.4s ease-out forwards;
+    }
+    .sel-done-tick {
+      stroke-dasharray: 60;
+      stroke-dashoffset: 60;
+      animation: selDrawTick 0.3s ease-out 0.35s forwards;
+    }
+    .sel-pop {
+      animation: selPop 0.3s ease-out;
     }
 
     @keyframes billPulse {
@@ -161,7 +205,7 @@
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
             <path d="M9 12h6"/><path d="M9 16h6"/>
           </svg>
-          <span class="nav-label">CO TRACKING 2026</span>
+          <span class="nav-label">CO TRACKING</span>
           <span class="nav-short">TRACKING</span>
         </button>
 
@@ -203,7 +247,7 @@
         </div>
 
         <!-- MODERN KPI CARDS OVERVIEW -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <div class="kpi-grid">
           <!-- CARD 1: TOTAL C/O ISSUED -->
           <div class="bg-white p-5 rounded-xl border border-[#E5E2DC] shadow-sm hover:shadow transition-all duration-200 flex items-center justify-between">
             <div class="space-y-1">
@@ -292,7 +336,7 @@
           <!-- Đặt max-w và căn chỉnh để màn hình rộng không bị bè ngang -->
           <div class="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 border-b pb-3">
-              <h2 class="text-base font-bold text-slate-800 uppercase tracking-wide">CHART OF THE NUMBER OF ISSUED C/O</h2>
+              <h2 class="text-base font-bold text-slate-800 uppercase">Monthly C/O Issued</h2>
               <div class="flex items-center gap-2">
                 <button id="chart-btn-2025" onclick="setChartYear(2025)" class="px-4 py-1.5 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">2025</button>
                 <button id="chart-btn-2026" onclick="setChartYear(2026)" class="px-4 py-1.5 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">2026</button>
@@ -303,7 +347,7 @@
 
           <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
             <div class="flex items-center justify-between gap-2 mb-4 border-b pb-3">
-              <h2 class="text-base font-bold text-slate-800 uppercase tracking-wide">CHART OF C/O ISSUANCE VOLUME</h2>
+              <h2 class="text-base font-bold text-slate-800 uppercase">C/O by Form</h2>
             </div>
             <div class="flex items-center gap-4">
               <div id="form-donut" class="shrink-0"></div>
@@ -316,15 +360,26 @@
       </div>
 
       <!-- TAB 1: CO TRACKING SEDO 2026 -->
-      <div id="section-co-tracking">
+      <div id="section-co-tracking" class="pb-20">
+
+        <!-- Floating selection bar (visible when rows are selected) -->
+        <div id="sel-bar" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-40 items-center gap-2 bg-slate-800 text-white p-2 rounded-xl shadow-lg">
+          <button id="sel-copy-btn" onclick="selOpenCopy()"
+            class="bg-sidebar-main hover:opacity-90 active:scale-95 text-white text-sm font-bold px-5 py-2 rounded-lg transition">Copy</button>
+          <button onclick="selOnClear()"
+            class="bg-slate-600 hover:bg-slate-500 active:scale-95 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">Clear</button>
+          <span id="sel-bar-missing" class="hidden text-xs font-semibold text-amber-300 px-2"></span>
+        </div>
         
        <!-- HEADER -->
         <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-          <div class="flex items-center gap-3">
-            <div>
-              <h1 class="text-3xl font-bold text-slate-800">CO TRACKING SEDO 2026</h1>
-              <p class="text-sm text-gray-500 mt-1">Theo dõi các loại chứng từ PDF thiếu, File Draft và Mã tờ khai thời gian thực</p>
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="inline-block w-2 h-2 rounded-full bg-[#265E9B]"></span>
+              <span class="text-[10px] font-bold tracking-widest text-[#265E9B] uppercase">UNI CONSULTING TRACKING</span>
             </div>
+            <h1 class="text-2xl font-extrabold text-[#2A2F3A] tracking-tight">C/O SHIPMENTS TRACKING</h1>
+            <p class="text-xs font-medium text-[#9A9CA1] mt-0.5">Real-time document tracking for C/O shipments.</p>
           </div>
           <div class="flex items-center gap-2">
             <span id="sync-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
@@ -347,17 +402,55 @@
 
         <!-- KPI STATS CARDS -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <p class="text-xs font-medium text-gray-500 uppercase">Tổng ECIS Đã Quét</p>
-            <p id="stat-total" class="text-2xl font-bold text-gray-800 mt-1">0</p>
+          <!-- CARD 1: TOTAL ECIS -->
+          <div class="bg-white p-5 rounded-xl border border-[#E5E2DC] shadow-sm hover:shadow transition-all duration-200 flex items-center justify-between">
+            <div class="space-y-1">
+              <span class="text-[11px] font-bold tracking-wider text-[#9A9CA1] uppercase">Total ECIS</span>
+              <div class="flex items-baseline gap-2">
+                <span id="stat-total" class="text-3xl font-extrabold text-[#2A2F3A] tracking-tight">0</span>
+                <span class="text-xs font-semibold text-[#9A9CA1]">folders</span>
+              </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-[#EAF0F8] flex items-center justify-center text-[#0E2A4E] shrink-0">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
           </div>
-          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <p class="text-xs font-medium text-gray-500 uppercase">ECIS Đã Đủ Hồ Sơ (Full)</p>
-            <p id="stat-ready" class="text-2xl font-bold text-green-600 mt-1">0</p>
+
+          <!-- CARD 2: COMPLETED DEADLINES -->
+          <div class="bg-white p-5 rounded-xl border border-[#E5E2DC] shadow-sm hover:shadow transition-all duration-200 flex items-center justify-between">
+            <div class="space-y-1">
+              <span class="text-[11px] font-bold tracking-wider text-[#9A9CA1] uppercase">Completed Deadlines</span>
+              <div class="flex items-baseline gap-2">
+                <span id="stat-ready" class="text-3xl font-extrabold text-[#2E7D55] tracking-tight">0</span>
+                <span class="text-xs font-semibold text-[#9A9CA1]">done (C/O issued)</span>
+              </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-[#E3F1EA] flex items-center justify-center text-[#2E7D55] shrink-0">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
           </div>
-          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <p class="text-xs font-medium text-gray-500 uppercase">ECIS Chưa Đủ Hồ Sơ</p>
-            <p id="stat-missing" class="text-2xl font-bold text-amber-600 mt-1">0</p>
+
+          <!-- CARD 3: INCOMPLETE RECORDS -->
+          <div class="bg-white p-5 rounded-xl border border-[#E5E2DC] shadow-sm hover:shadow transition-all duration-200 flex items-center justify-between">
+            <div class="space-y-1">
+              <span class="text-[11px] font-bold tracking-wider text-[#9A9CA1] uppercase">Incomplete Records</span>
+              <div class="flex items-baseline gap-2">
+                <span id="stat-missing" class="text-3xl font-extrabold text-[#B58325] tracking-tight">0</span>
+                <span class="text-xs font-semibold text-[#9A9CA1]">missing docs</span>
+              </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-[#FAF1DE] flex items-center justify-center text-[#D9A441] shrink-0">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
           </div>
         </div>
 
@@ -365,9 +458,15 @@
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col gap-4">
           
           <div class="flex flex-col md:flex-row gap-3 justify-between items-start">
-            <div class="w-full md:w-1/2">
-              <textarea id="search-input" oninput="filterData()" rows="2" placeholder="🔍 Tìm kiếm ECIS (Hỗ trợ nhập/dán nhiều mã phân cách bằng xuống dòng hoặc dấu phẩy)..." 
-                     class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+            <div class="w-full md:w-1/2 relative">
+              <div class="absolute top-2.5 left-3 pointer-events-none text-slate-400">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              </div>
+              <textarea id="search-input" oninput="filterData()" rows="2" placeholder="Search ECIS..." 
+                     class="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
             </div>
             
             <div class="flex gap-2 w-full md:w-auto flex-wrap md:flex-nowrap">
@@ -437,14 +536,15 @@
           <table class="w-full min-w-[1000px] text-left border-collapse text-sm">
             <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold border-b">
               <tr>
+                <th class="py-3 px-3 text-center w-10"></th>
                 <th class="py-3 px-4 text-center w-12">No.</th>
                 <th class="py-3 px-4">TYPE</th>
                 <th class="py-3 px-4 text-center cursor-pointer select-none hover:bg-slate-100" onclick="setSort('pl')" title="Sắp xếp Date PL">Date PL <span id="sort-pl-arrow">▼</span></th>
                 <th class="py-3 px-4">Country</th>
                 <th class="py-3 px-4 text-center">FORM</th>
-                <th class="py-3 px-4 text-center">Số C/O</th>
+                <th class="py-3 px-4 text-center">Number C/O</th>
                 <th class="py-3 px-4">ECIS</th>
-                <th class="py-3 px-4">Tờ Khai</th>
+                <th class="py-3 px-4">Declaration</th>
                 <th class="py-3 px-4">FILE THIẾU</th>
                 <th class="py-3 px-4 text-center cursor-pointer select-none hover:bg-slate-100" onclick="setSort('etd')" title="Sắp xếp ETD">ETD <span id="sort-etd-arrow">↕</span></th>
                 <th class="py-3 px-4 text-center">DEADLINE</th>
@@ -562,6 +662,20 @@
   </div>
 
   <!-- MODAL XEM CHI TIẾT FILE -->
+  <!-- Selection popup (Copy / Clear / Done) -->
+  <div id="sel-popup" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-[60]"
+       onclick="if (event.target === this) selClosePopup()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <div class="flex items-center gap-3 -mx-6 -mt-6 mb-4 px-6 py-4 rounded-t-2xl bg-sidebar-main">
+        <div class="bg-white p-1.5 rounded-lg shadow-sm flex items-center justify-center shrink-0">
+          <img src="logo/logo-uni.png" alt="UNI Logo" class="h-12 w-auto object-contain" onerror="this.style.display='none'">
+        </div>
+        <h3 id="sel-popup-title" class="font-bold text-white text-lg"></h3>
+      </div>
+      <div id="sel-popup-body"></div>
+    </div>
+  </div>
+
   <div id="file-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
       <div class="p-4 border-b flex justify-between items-center">
@@ -719,6 +833,7 @@
 
     // ---- Map "Số tờ khai -> Số C/O" lấy từ tab ECOSYS MOIT ----
     let ecosysByToKhai = new Map();
+    let ecosysFormByCo = new Map();
 
     // Dữ liệu + phân trang cho tab ECOSYS MOIT
     let ecosysData = [];
@@ -740,17 +855,38 @@
       return (String(s).match(/\d{9,}/g) || []);
     }
 
-    // Trả về số C/O nếu khớp DUY NHẤT 1 số C/O qua số tờ khai; ngược lại null
-    function resolveSoCO(item) {
+    // Trả về TẤT CẢ số C/O (không trùng, đã sắp xếp) khớp qua các số tờ khai của 1 ECIS; không có thì trả mảng rỗng
+    function resolveSoCOs(item) {
       const decl = extractDeclarationNumbers(item.xls_list); // "123, 456" | "---"
-      if (!decl || decl === '---') return null;
+      if (!decl || decl === '---') return [];
       const nums = decl.split(',').map(s => normDigits(s)).filter(Boolean);
       const found = new Set();
       for (const n of nums) {
         const set = ecosysByToKhai.get(n);
         if (set) set.forEach(co => found.add(co));
       }
-      return found.size === 1 ? [...found][0] : null;
+      return [...found].sort();
+    }
+
+    // Mẫu C/O trên ECOSYS: bỏ tiền tố "Mẫu", viết hoa
+    function normMauCo(mau) {
+      const s = String(mau || '').replace(/^Mẫu\s+/i, '').trim().toUpperCase();
+      return s || '---';
+    }
+
+    // Mẫu theo đúng thứ tự số C/O. Chỉ dùng khi có từ 2 số.
+    function resolveSoCOForms(item) {
+      return resolveSoCOs(item).map(co => ecosysFormByCo.get(co) || '---');
+    }
+
+    function formBadge(formValue) {
+      if (formValue && formValue !== '---' && formValue !== 'NO') {
+        return `<span class="inline-block bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs px-2 py-0.5 rounded">${formValue}</span>`;
+      }
+      if (formValue === 'NO') {
+        return `<span class="inline-block bg-gray-100 text-gray-500 font-medium text-xs px-2 py-0.5 rounded">NO</span>`;
+      }
+      return `<span class="text-gray-400 text-xs">---</span>`;
     }
 
     async function triggerSyncAndReload() {
@@ -780,18 +916,28 @@
     }
 
     function checkHasBill(pdfList, category) {
-      if (!pdfList || !Array.isArray(pdfList)) return false;
       const isLCL = (category && category.toUpperCase() === 'LCL');
-      const billKey = isLCL ? '_FCR.PDF' : '_B.PDF';
-      return pdfList.some(f => f.toUpperCase().includes(billKey));
+      return hasPdfType(pdfList, isLCL ? '_FCR' : '_B');
     }
-    // Có file PDF đúng loại không — chấp nhận hậu tố trùng tên " (1)", " (2)"
-    // (vd _PL.pdf, _PL (1).pdf, _PL.pdf (2) đều tính là CÓ; _PLX, _BK không ăn nhầm _PL/_B)
+    // Mã chứng từ ĐẦU TIÊN trong tên file quyết định loại: "_" + nguyên mã (liền sau KHÔNG phải chữ cái) + đuôi bất kỳ + kết thúc .pdf
+    // (vd "_B abc.pdf" -> B, "_BK abc.pdf" -> BK; _B không ăn nhầm _BK, _PL không ăn nhầm _PLX)
+    function pdfDocType(fileName) {
+      if (!/\.pdf(?:\s*\(\d+\))?$/i.test(fileName)) return null;   // phải kết thúc bằng .pdf
+      const m = fileName.match(/_(BK|PLX|PL|TKN\+VAT|QTSX|FCR|B)(?![A-Za-z])/i);
+      return m ? m[1].toUpperCase() : null;
+    }
+    // Có file PDF đúng loại không: giữ NGUYÊN cách nhận cũ (mã ngay trước .pdf, hậu tố " (1)") + thêm cách nhận mới (mã đầu tiên + đuôi bất kỳ)
     function hasPdfType(pdfList, key) {
       if (!pdfList || !Array.isArray(pdfList)) return false;
       const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = new RegExp(esc + '(?:[ _\\-]*\\d+|\\s*\\(\\d+\\))*\\.PDF(?:\\s*\\(\\d+\\))?$', 'i');
-      return pdfList.some(f => re.test(f));
+      const reOld = new RegExp(esc + '(?:[ _\\-]*\\d+|\\s*\\(\\d+\\))*\\.PDF(?:\\s*\\(\\d+\\))?$', 'i');
+      const code = key.replace(/^_/, '').toUpperCase();
+      return pdfList.some(f => reOld.test(f) || pdfDocType(f) === code);
+    }
+    // INV = PDF đặt tên bằng số: cách cũ (_123456.pdf) + cách mới (_123456 đuôi bất kỳ.pdf, miễn tên không chứa mã chứng từ khác)
+    function isInvoicePdf(f) {
+      if (/_\d+(\s*\(\d+\))?\.pdf(\s*\(\d+\))?$/i.test(f)) return true;
+      return /\.pdf(\s*\(\d+\))?$/i.test(f) && /_\d+(?![A-Za-z0-9_])/.test(f) && !/_(BK|PLX|PL|TKN\+VAT|QTSX|FCR|B)(?![A-Za-z])/i.test(f);
     }
 
     function getMissingPdfTypes(pdfList, category, countryStr, xlsList) {
@@ -812,8 +958,8 @@
       if (!hasPdfType(pdfList, '_QTSX')) missing.push('QTSX');
       if (!hasPdfType(pdfList, '_PL')) missing.push('PL');
 
-      // INV = file PDF đặt tên bằng số (vd _123456.pdf), chấp nhận hậu tố "(1)"
-      const hasNumberPdf = pdfList.some(f => /_\d+(\s*\(\d+\))?\.pdf(\s*\(\d+\))?$/i.test(f));
+      // INV = file PDF đặt tên bằng số (vd _123456.pdf, hoặc _123456 đuôi bất kỳ.pdf)
+      const hasNumberPdf = pdfList.some(isInvoicePdf);
       if (!hasNumberPdf) missing.push('INV');
 
       if (form === 'EUR.1') {
@@ -944,8 +1090,9 @@
 
       const detail = document.getElementById('donut-detail');
       if (donutTotal === 0) {
-        svgWrap.innerHTML = '<div class="text-sm text-slate-400 py-12 px-4 text-center">Chưa có dữ liệu năm '+chartYear+'</div>';
+        svgWrap.innerHTML = '<div class="text-sm text-slate-400 py-12 px-4 text-center">No data for '+chartYear+'</div>';
         legend.innerHTML = ''; if (detail) detail.innerHTML = '';
+        updateStatsKPIs(); // keep the KPI cards in sync with the selected year
         return;
       }
 
@@ -968,17 +1115,19 @@
         acc += seg; return el;
       }).join('');
 
-      svgWrap.innerHTML = `<svg width="160" height="160" viewBox="0 0 160 160" style="overflow:visible"><defs>${defs}</defs><g style="filter:drop-shadow(0px 4px 3px rgba(38,94,155,0.25));">${segs}</g><text id="donut-center-num" x="${CX}" y="${CY-2}" text-anchor="middle" style="fill:#1e293b;font-size:24px;font-weight:700;">${donutTotal}</text><text id="donut-center-label" x="${CX}" y="${CY+16}" text-anchor="middle" style="fill:#94a3b8;font-size:10px;">C/O</text></svg>`;
+      svgWrap.innerHTML = `<svg width="160" height="160" viewBox="0 0 160 160" style="overflow:visible"><defs>${defs}</defs><g style="filter:drop-shadow(0px 4px 3px rgba(38,94,155,0.25));">${segs}</g><text id="donut-center-num" x="${CX}" y="${CY-2}" text-anchor="middle" style="fill:#1e293b;font-size:24px;font-weight:700;">${fmtNum(donutTotal)}</text><text id="donut-center-label" x="${CX}" y="${CY+16}" text-anchor="middle" style="fill:#94a3b8;font-size:11px;">C/O</text></svg>`;
 
       legend.innerHTML = donutEntries.map(([form,v,color],i) => {
-        const pct = ((v/donutTotal)*100).toFixed(0);
-        const name = (form==='---') ? 'Chưa có Form' : form;
-        return `<div class="flex items-center justify-between text-xs cursor-pointer" onmouseover="donutHover(${i})" onmouseout="donutHover(-1)"><span class="flex items-center gap-1.5 truncate"><span class="inline-block w-3 h-3 rounded-sm shrink-0" style="background:${color}"></span>${name}</span><span class="font-semibold text-slate-700 shrink-0">${v} (${pct}%)</span></div>`;
+        const pct = ((v/donutTotal)*100).toFixed(1);
+        const name = (form==='---') ? 'No Form' : form;
+        return `<div class="flex items-center justify-between text-xs cursor-pointer" onmouseover="donutHover(${i})" onmouseout="donutHover(-1)"><span class="flex items-center gap-1.5 truncate"><span class="inline-block w-3 h-3 rounded-sm shrink-0" style="background:${color}"></span>${name}</span><span class="font-semibold text-slate-700 shrink-0">${fmtNum(v)} (${pct}%)</span></div>`;
       }).join('');
 
       donutHover(-1);
       updateStatsKPIs();
     }
+    // One number format for the whole Stats page: thousands separator, e.g. 4,329
+    function fmtNum(n) { return Number(n).toLocaleString('en-US'); }
     // ===== Avg. Processing Time: ETD (+1 working day) -> C/O declaration date =====
     // Working days = Mon-Fri, excluding public holidays (holidays are treated like Sat/Sun)
     const CUSTOMER_LAG_WORKDAYS = 1;   // customer sends documents 1 working day after ETD
@@ -1110,7 +1259,7 @@
         const share = donutTotal ? ((count / donutTotal) * 100).toFixed(1) : 0;
 
         if (elTopForm) elTopForm.textContent = formName;
-        if (elTopCount) elTopCount.textContent = `(${count} C/O)`;
+        if (elTopCount) elTopCount.textContent = `(${fmtNum(count)} C/O)`;
         if (elTopShare) elTopShare.textContent = `${share}% Share`;
       } else {
         if (elTopForm) elTopForm.textContent = '—';
@@ -1131,7 +1280,7 @@
       const elProcSub = document.getElementById('kpi-proc-sub');
       const pt = computeProcessingTime(chartYear);
       if (elProc) elProc.textContent = pt.n ? pt.avg.toFixed(1) : '—';
-      if (elProcSub) elProcSub.textContent = pt.n ? `Median ${pt.median.toFixed(1)} d · n = ${pt.n}` : 'No data';
+      if (elProcSub) elProcSub.textContent = pt.n ? `Median ${pt.median.toFixed(1)} d · n = ${fmtNum(pt.n)}` : 'No data';
     }
 
     function donutHover(i) {
@@ -1141,7 +1290,7 @@
       const detail = document.getElementById('donut-detail');
       if (i < 0 || !donutEntries[i]) {
         circles.forEach(c => { c.setAttribute('stroke-width', c.getAttribute('data-sw')); c.style.opacity = '1'; });
-        if (numEl) numEl.textContent = donutTotal;
+        if (numEl) numEl.textContent = fmtNum(donutTotal);
         if (labEl) labEl.textContent = 'C/O';
         if (detail) detail.innerHTML = '';
         return;
@@ -1149,9 +1298,9 @@
       const [form, v, color] = donutEntries[i];
       const pct = donutTotal ? ((v/donutTotal)*100).toFixed(1) : '0';
       circles.forEach((c,k) => { const base=c.getAttribute('data-sw'); c.setAttribute('stroke-width', k===i?(Number(base)+9):base); c.style.opacity = k===i?'1':'0.4'; });
-      if (numEl) numEl.textContent = v;
+      if (numEl) numEl.textContent = fmtNum(v);
       if (labEl) labEl.textContent = (form==='---' ? 'No Form' : form);
-      if (detail) detail.innerHTML = `<div class="flex items-center gap-2 mb-1"><span class="inline-block w-4 h-4 rounded" style="background:${color}"></span><span class="font-bold text-slate-800">${form==='---'?'Chưa có Form':form}</span></div><div class="text-3xl font-extrabold text-slate-800 leading-none">${v}</div><div class="text-sm text-slate-500 mt-0.5">${pct}% tổng số</div>`;
+      if (detail) detail.innerHTML = `<div class="flex items-center gap-2 mb-1"><span class="inline-block w-4 h-4 rounded" style="background:${color}"></span><span class="font-bold text-slate-800">${form==='---'?'No Form':form}</span></div><div class="text-2xl font-extrabold text-slate-800 leading-none">${fmtNum(v)}</div><div class="text-sm text-slate-500 mt-0.5">${pct}% of total</div>`;
     }
     function renderChart() {
       const yl=document.getElementById('chart-year-label'); if(yl) yl.innerText=chartYear;
@@ -1201,11 +1350,11 @@
         const animCss = !hasAnimatedStats ? 'animation: barRise 1.8s ease-out forwards;' : '';
         if(i===inProgressIdx){
           bars+=`<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="4" ry="4" style="fill:#265E9B;fill-opacity:0.25;stroke:#265E9B;stroke-width:1.5;stroke-dasharray:4 3;transform-box:fill-box;transform-origin:bottom;${animCss}"></rect>`;
-          if(slot>=44) bars+=`<text x="${cx}" y="${y-20}" text-anchor="middle" style="fill:#64748b;font-size:10px;font-weight:600;">In progress</text>`;
+          if(slot>=44) bars+=`<text x="${cx}" y="${y-20}" text-anchor="middle" style="fill:#64748b;font-size:11px;font-weight:600;">In progress</text>`;
         } else {
           bars+=`<rect class="bar-gradient" x="${x}" y="${y}" width="${bw}" height="${h}" rx="4" ry="4" ${animCss?`style="${animCss}"`:''}></rect>`;
         }
-        bars+=`<text x="${cx}" y="${y-6}" text-anchor="middle" style="fill:#1e293b;font-size:11px;font-weight:700;">${v}</text>`
+        bars+=`<text x="${cx}" y="${y-6}" text-anchor="middle" style="fill:#1e293b;font-size:12px;font-weight:700;">${fmtNum(v)}</text>`
             + `<text x="${cx}" y="${H-8}" text-anchor="middle" style="fill:#64748b;font-size:11px;font-weight:600;">${names[i]}</text>`;
 
         const cy = baseY - Math.round((cum[i]/maxC)*Hp);
@@ -1224,7 +1373,7 @@
       const lineAnimClass = !hasAnimatedStats ? 'line-anim' : '';
       if (!hasAnimatedStats) _chartAnimUntil = Date.now() + 1900;
       const lp = pts[pts.length-1];
-      const clab = `<text x="${lp[0]+bw/2+8}" y="${lp[1]+4}" text-anchor="start" style="fill:#b45309;font-size:13px;font-weight:800;">${lp[2].toLocaleString('en-US')}</text>`;
+      const clab = `<text x="${lp[0]+bw/2+8}" y="${lp[1]+4}" text-anchor="start" style="fill:#b45309;font-size:14px;font-weight:800;">${fmtNum(lp[2])}</text>`;
 
       // pathLength="1000" keeps the draw-in animation (dasharray 1000) complete at any width
       wrap.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto;">
@@ -1311,18 +1460,21 @@
     }
 
     function updateKPIs(data) {
-      let fullCount = 0;
+      let doneCount = 0;
       let missingCount = 0;
 
       data.forEach(item => {
+        const soCOs = resolveSoCOs(item);
+        const isDone = soCOs.length > 0;
+        if (isDone) doneCount++;
+
         const missing = getMissingPdfTypes(item.pdf_list, item.category, item.country, item.xls_list);
-        if (missing.length === 0) fullCount++;
-        else missingCount++;
+        if (missing.length > 0) missingCount++;
       });
 
-      document.getElementById('stat-total').innerText = data.length;
-      document.getElementById('stat-ready').innerText = fullCount;
-      document.getElementById('stat-missing').innerText = missingCount;
+      document.getElementById('stat-total').innerText = fmtNum(data.length);
+      document.getElementById('stat-ready').innerText = fmtNum(doneCount);
+      document.getElementById('stat-missing').innerText = fmtNum(missingCount);
     }
 
     function filterData() {
@@ -1343,6 +1495,7 @@
       filteredData = globalData.filter(item => {
         const folderNameLower = item.folder_name.toLowerCase();
         const itemForm = getFormByCountry(item.country);
+        const soCOForms = resolveSoCOForms(item);
 
         let matchSearch = true;
         if (searchTerms.length > 0) {
@@ -1350,9 +1503,12 @@
         }
 
         const matchCat = cat === 'ALL' || item.category === cat;
+        // Từ 2 số C/O: khớp 1 mẫu là hiện dòng, cột Form vẫn show đủ các mẫu
         const matchForm = selectedForm === 'ALL'
           ? true
-          : (selectedForm === 'NONE' ? itemForm === '---' : itemForm === selectedForm);
+          : (soCOForms.length >= 2
+              ? (selectedForm === 'NONE' ? soCOForms.every(f => f === '---') : soCOForms.includes(selectedForm))
+              : (selectedForm === 'NONE' ? itemForm === '---' : itemForm === selectedForm));
 
         const hasBill = checkHasBill(item.pdf_list, item.category);
         let matchBill = true;
@@ -1387,12 +1543,333 @@
       renderTable();
     }
 
+    // ---------------- ROW SELECTION + COPY / CLEAR ----------------
+    const SEL_UNDO_LIMIT = 20;      // max undo steps (Ctrl+Z)
+    const SEL_DONE_MS = 1200;       // success popup display time
+    const SEL_ERROR_MS = 2500;      // error popup display time
+    let selIds = new Set();         // selected ECIS ids (kept across pages, filters and data reloads)
+    let selAnchorId = null;         // last clicked row, used as the Shift+click anchor
+    let selPastedTerms = [];        // last list pasted into the Search box (original case)
+    let selMissingCount = 0;        // pasted values that match no row in the data
+    let selDoneTimer = null;
+    const selUndoStack = [];
+
+    const SEL_TICK_SVG = `
+      <svg class="sel-pop" width="72" height="72" viewBox="0 0 52 52" fill="none">
+        <circle class="sel-done-circle" cx="26" cy="26" r="25" stroke="#22c55e" stroke-width="2.5"/>
+        <path class="sel-done-tick" d="M14 27 l8 8 l16 -16" stroke="#22c55e" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+    const SEL_CROSS_SVG = `
+      <svg class="sel-pop" width="72" height="72" viewBox="0 0 52 52" fill="none">
+        <circle class="sel-done-circle" cx="26" cy="26" r="25" stroke="#ef4444" stroke-width="2.5"/>
+        <path class="sel-done-tick" d="M17 17 L35 35 M35 17 L17 35" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round"/>
+      </svg>`;
+
+    function selEsc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function selRowsLabel(n) {
+      return n + (n === 1 ? ' row' : ' rows');
+    }
+
+    // Selected items in table order (globalData is kept sorted by applySort)
+    function selGetItems() {
+      return globalData.filter(it => selIds.has(String(it.id)));
+    }
+
+    // Refresh the checkboxes of the rows currently on screen
+    function selSyncChecks() {
+      document.querySelectorAll('#table-body .row-check').forEach(cb => {
+        cb.checked = selIds.has(cb.dataset.id);
+      });
+    }
+
+    function selUpdateBar() {
+      const bar = document.getElementById('sel-bar');
+      if (!bar) return;
+      const n = selGetItems().length;
+      const show = n > 0 || selMissingCount > 0;
+      bar.classList.toggle('hidden', !show);
+      bar.classList.toggle('flex', show);
+      document.getElementById('sel-copy-btn').textContent = n > 0 ? 'Copy (' + n + ')' : 'Copy';
+      const miss = document.getElementById('sel-bar-missing');
+      miss.textContent = selMissingCount + ' Not found';
+      miss.classList.toggle('hidden', selMissingCount === 0);
+    }
+
+    // ---- Undo (Ctrl+Z), last 20 selection actions ----
+    function selPushUndo() {
+      selUndoStack.push({ ids: new Set(selIds), terms: selPastedTerms.slice() });
+      if (selUndoStack.length > SEL_UNDO_LIMIT) selUndoStack.shift();
+    }
+
+    function selUndo() {
+      const snap = selUndoStack.pop();
+      if (!snap) return;
+      selIds = snap.ids;
+      selPastedTerms = snap.terms;
+      selAnchorId = null;
+      selRefreshReport();
+      selSyncChecks();
+      selUpdateBar();
+    }
+
+    // ---- Pasted list report ----
+    function selParseTerms(raw) {
+      const seen = new Set();
+      const out = [];
+      String(raw || '').split(/[\n,\s]+/).forEach(t => {
+        t = t.trim();
+        const k = t.toLowerCase();
+        if (k && !seen.has(k)) { seen.add(k); out.push(t); }
+      });
+      return out;
+    }
+
+    // Count pasted values that match no row at all
+    function selRefreshReport() {
+      if (selPastedTerms.length === 0) { selMissingCount = 0; return; }
+      const names = globalData.map(it => String(it.folder_name || '').toLowerCase());
+      selMissingCount = selPastedTerms.filter(t => {
+        const k = t.toLowerCase();
+        return !names.some(n => n.includes(k));
+      }).length;
+    }
+
+    // notInData: no row matches. notSelected: rows exist but none of them is selected
+    function selGetReport() {
+      const notInData = [];
+      const notSelected = [];
+      if (selPastedTerms.length === 0) return { notInData, notSelected };
+      const rows = globalData.map(it => ({
+        name: String(it.folder_name || '').toLowerCase(),
+        sel: selIds.has(String(it.id))
+      }));
+      selPastedTerms.forEach(t => {
+        const k = t.toLowerCase();
+        let found = false;
+        let picked = false;
+        for (const r of rows) {
+          if (r.name.includes(k)) {
+            found = true;
+            if (r.sel) { picked = true; break; }
+          }
+        }
+        if (!found) notInData.push(t);
+        else if (!picked) notSelected.push(t);
+      });
+      return { notInData, notSelected };
+    }
+
+    // ---- Row checkbox click (supports Shift+click range across pages) ----
+    function selOnRowClick(event, id) {
+      id = String(id);
+      const checked = event.target.checked;
+      selPushUndo();
+      let ids = [id];
+      if (event.shiftKey && selAnchorId !== null) {
+        const a = filteredData.findIndex(it => String(it.id) === selAnchorId);
+        const b = filteredData.findIndex(it => String(it.id) === id);
+        if (a >= 0 && b >= 0) {
+          const lo = Math.min(a, b);
+          const hi = Math.max(a, b);
+          ids = filteredData.slice(lo, hi + 1).map(it => String(it.id));
+        }
+      }
+      ids.forEach(x => {
+        if (checked) selIds.add(x);
+        else selIds.delete(x);
+      });
+      selAnchorId = id;
+      if (window.getSelection) window.getSelection().removeAllRanges();
+      selSyncChecks();
+      selUpdateBar();
+    }
+
+    // ---- Paste into Search ECIS: auto-tick the matching rows ----
+    function selOnSearchInput(e) {
+      if (e.inputType !== 'insertFromPaste' && e.inputType !== 'insertFromDrop') return;
+      const terms = selParseTerms(document.getElementById('search-input').value);
+      if (terms.length === 0) return;
+      selPushUndo();
+      selPastedTerms = terms;
+      // filterData() already ran (inline oninput), so filteredData = search + all other filters
+      filteredData.forEach(it => selIds.add(String(it.id)));
+      selRefreshReport();
+      selSyncChecks();
+      selUpdateBar();
+    }
+
+    // ---- Copy ----
+    function selBuildText(items, mode) {
+      return items.map(it => {
+        const co = resolveSoCOs(it).join(', ') || '---';
+        const ecis = String(it.folder_name || '---');
+        const decl = extractDeclarationNumbers(it.xls_list);
+        if (mode === 'co') return co;
+        if (mode === 'ecis') return ecis;
+        if (mode === 'decl') return decl;
+        return [co, ecis, decl].join('\t');
+      }).join('\n');
+    }
+
+    async function selWriteClipboard(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (e) { /* fall through to the fallback below */ }
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // ---- Popup ----
+    function selOpenPopup(title, html) {
+      clearTimeout(selDoneTimer);
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      document.getElementById('sel-popup-title').textContent = title;
+      document.getElementById('sel-popup-body').innerHTML = html;
+      const p = document.getElementById('sel-popup');
+      p.classList.remove('hidden');
+      p.classList.add('flex');
+    }
+
+    function selClosePopup() {
+      clearTimeout(selDoneTimer);
+      const p = document.getElementById('sel-popup');
+      p.classList.add('hidden');
+      p.classList.remove('flex');
+    }
+
+    function selShowDone(message, ok) {
+      selOpenPopup(ok ? 'Done' : 'Error', `
+        <div class="flex flex-col items-center py-4">
+          ${ok ? SEL_TICK_SVG : SEL_CROSS_SVG}
+          <p class="mt-3 text-sm font-semibold text-slate-700 text-center">${selEsc(message)}</p>
+        </div>`);
+      selDoneTimer = setTimeout(selClosePopup, ok ? SEL_DONE_MS : SEL_ERROR_MS);
+    }
+
+    function selOpenCopy() {
+      const n = selGetItems().length;
+      const rep = selGetReport();
+      const optCls = 'px-4 py-3 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-300 text-sm font-semibold text-slate-700 transition'
+        + (n === 0 ? ' opacity-50 pointer-events-none' : '');
+      let html = `
+        <p class="text-sm text-slate-600 mb-3">Will copy <b>${selRowsLabel(n)}</b>. Choose what to copy:</p>
+        <div class="grid grid-cols-2 gap-2 mb-1">
+          <button class="${optCls}" onclick="selDoCopy('co')">Number C/O</button>
+          <button class="${optCls}" onclick="selDoCopy('ecis')">ECIS</button>
+          <button class="${optCls}" onclick="selDoCopy('decl')">Declaration</button>
+          <button class="${optCls}" onclick="selDoCopy('all')">All</button>
+        </div>
+        <p class="text-[11px] text-slate-400 mb-3">All = Number C/O, ECIS, Declaration (tab-separated, ready to paste into Excel).</p>`;
+      if (rep.notInData.length > 0) {
+        html += `
+          <div class="mb-2 rounded-lg border border-red-200 bg-red-50 p-3">
+            <div class="text-xs font-bold text-red-700 mb-1">Not found in data (${rep.notInData.length})</div>
+            <div class="max-h-28 overflow-y-auto font-mono text-xs text-red-800 break-all select-text">${rep.notInData.map(t => selEsc(t)).join('<br>')}</div>
+          </div>`;
+      }
+      if (rep.notSelected.length > 0) {
+        html += `
+          <div class="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div class="text-xs font-bold text-amber-700 mb-1">Found but not selected (${rep.notSelected.length})</div>
+            <div class="text-[11px] text-amber-700 mb-1">Hidden by a filter, or unticked.</div>
+            <div class="max-h-28 overflow-y-auto font-mono text-xs text-amber-900 break-all select-text">${rep.notSelected.map(t => selEsc(t)).join('<br>')}</div>
+          </div>`;
+      }
+      selOpenPopup('Copy', html);
+    }
+
+    async function selDoCopy(mode) {
+      const items = selGetItems();
+      if (items.length === 0) return;
+      const ok = await selWriteClipboard(selBuildText(items, mode));
+      if (ok) selShowDone('Copied ' + selRowsLabel(items.length), true);
+      else selShowDone('Copy failed. Please allow clipboard access.', false);
+    }
+
+    // ---- Clear ----
+    function selOnClear() {
+      const n = selGetItems().length;
+      if (n === 0) {
+        // Nothing selected: only reset the pasted-list report
+        selPushUndo();
+        selIds = new Set();
+        selPastedTerms = [];
+        selAnchorId = null;
+        selRefreshReport();
+        selSyncChecks();
+        selUpdateBar();
+        return;
+      }
+      selOpenPopup('Clear selection', `
+        <p class="text-sm text-slate-600">Clear all <b>${n}</b> selected ${n === 1 ? 'row' : 'rows'}?</p>
+        <div class="flex justify-end gap-2 mt-5">
+          <button onclick="selClosePopup()" class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Cancel</button>
+          <button id="sel-ok-btn" onclick="selConfirmClear()" class="px-5 py-2 rounded-lg bg-sidebar-main hover:opacity-90 text-white text-sm font-bold transition">OK</button>
+        </div>`);
+      const okBtn = document.getElementById('sel-ok-btn');
+      if (okBtn) okBtn.focus();
+    }
+
+    function selConfirmClear() {
+      const n = selGetItems().length;
+      selPushUndo();
+      selIds = new Set();
+      selPastedTerms = [];
+      selAnchorId = null;
+      selRefreshReport();
+      selSyncChecks();
+      selUpdateBar();
+      selShowDone(selRowsLabel(n) + ' cleared', true);
+    }
+
+    // ---- Keyboard: Esc closes the popup, Ctrl/Cmd+Z undoes the last selection action ----
+    document.addEventListener('keydown', function (e) {
+      const popup = document.getElementById('sel-popup');
+      if (popup && !popup.classList.contains('hidden')) {
+        if (e.key === 'Escape') selClosePopup();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'z') {
+        const sec = document.getElementById('section-co-tracking');
+        if (!sec || sec.classList.contains('hidden')) return;
+        const t = e.target;
+        const tag = t && t.tagName ? t.tagName : '';
+        const typing = tag === 'TEXTAREA' || tag === 'SELECT'
+          || (tag === 'INPUT' && t.type !== 'checkbox')
+          || (t && t.isContentEditable);
+        if (typing) return;   // keep the native text undo inside inputs
+        if (selUndoStack.length === 0) return;
+        e.preventDefault();
+        selUndo();
+      }
+    });
+
+    document.getElementById('search-input').addEventListener('input', selOnSearchInput);
+
     function renderTable() {
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = '';
 
       if (filteredData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="14" class="text-center py-6 text-gray-400">Không tìm thấy bản ghi nào khớp với điều kiện lọc.</td></tr>`;
         renderPagination(0);
         return;
       }
@@ -1404,9 +1881,15 @@
       pageData.forEach((item, index) => {
         const stt = startIndex + index + 1;
         const missingList = getMissingPdfTypes(item.pdf_list, item.category, item.country, item.xls_list);
-        
+        const formsShown = resolveSoCOs(item).length >= 2
+          ? resolveSoCOForms(item)
+          : [getFormByCountry(item.country)];
+        const formIsNo = formsShown.length > 0 && formsShown.every(f => f === 'NO');
+
         let missingDisplay = '';
-        if (missingList.length === 0) {
+        if (formIsNo) {
+          missingDisplay = `<span class="text-gray-400 text-xs">---</span>`;
+        } else if (missingList.length === 0) {
           missingDisplay = `<span class="inline-flex items-center justify-center bg-green-600 text-white font-bold text-sm px-2 py-0.5 rounded shadow-sm" title="Đủ hồ sơ">✓</span>`;
         } else {
           missingDisplay = missingList.map(tag => {
@@ -1429,26 +1912,31 @@
           ? `<span class="inline-block bg-blue-50 text-blue-700 font-bold text-xs px-2 py-0.5 rounded border border-blue-200">${item.etd}</span>`
           : `<span class="text-gray-400 text-xs">---</span>`;
 
-        const soCO = resolveSoCO(item);
-        const soCODisplay = soCO
-          ? `<span class="inline-block bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">${soCO}</span>`
+        const soCOs = resolveSoCOs(item);
+        const soCOForms = soCOs.map(co => ecosysFormByCo.get(co) || '---');
+        const soCODisplay = soCOs.length
+          ? `<div class="flex flex-col items-center gap-1">${soCOs.map(co => `<span class="inline-block bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">${co}</span>`).join('')}</div>`
           : `<span class="text-gray-400 text-xs">---</span>`;
 
-        const deadlineDisplay = soCO
+        const deadlineDisplay = soCOs.length
           ? `<span class="inline-flex items-center gap-1 bg-green-600 text-white font-bold text-xs px-2 py-0.5 rounded shadow-sm">✓ DONE</span>`
           : getDeadlineBadge(item.deadline);
         const countryDisplay = item.country || '---';
 
         const formValue = getFormByCountry(countryDisplay);
-        const formDisplay = (formValue !== '---' && formValue !== 'NO')
-          ? `<span class="inline-block bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs px-2 py-0.5 rounded">${formValue}</span>`
-          : (formValue === 'NO' 
-            ? `<span class="inline-block bg-gray-100 text-gray-500 font-medium text-xs px-2 py-0.5 rounded">NO</span>`
-            : `<span class="text-gray-400 text-xs">---</span>`);
+        const formDisplay = soCOs.length >= 2
+          ? `<div class="flex flex-col items-center gap-1">${soCOForms.map(formBadge).join('')}</div>`
+          : formBadge(formValue);
 
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50 transition border-b";
         tr.innerHTML = `
+          <td class="py-3 px-3 text-center">
+            <input type="checkbox" class="row-check w-4 h-4 cursor-pointer accent-blue-600"
+              data-id="${item.id}"
+              ${selIds.has(String(item.id)) ? 'checked' : ''}
+              onclick="selOnRowClick(event, '${item.id}')">
+          </td>
           <td class="py-3 px-4 text-center font-bold text-slate-400 text-xs">${stt}</td>
           <td class="py-3 px-4 font-bold ${item.category === 'FCL' ? 'text-blue-600' : 'text-purple-600'}">${item.category}</td>
           <td class="py-3 px-4 text-center font-semibold text-slate-700 bg-slate-50/50">${plDateDisplay}</td>
@@ -1641,15 +2129,18 @@
 
       // Map số tờ khai -> tập số C/O (TÁCH nhiều số trong 1 ô)
       ecosysByToKhai = new Map();
+      ecosysFormByCo = new Map();
       ecosysData.forEach(r => {
         const co = (r.so_co || '').trim();
         if (!co) return;
+        const form = normMauCo(r.mau_co);
+        if (!ecosysFormByCo.has(co) || ecosysFormByCo.get(co) === '---') ecosysFormByCo.set(co, form);
         extractTkNumbers(r.so_to_khai).forEach(k => {
           if (!ecosysByToKhai.has(k)) ecosysByToKhai.set(k, new Set());
           ecosysByToKhai.get(k).add(co);
         });
       });
-      if (filteredData && filteredData.length) renderTable(); // cập nhật cột Số C/O bên CO
+      if (globalData && globalData.length) filterData(); // lọc lại để Form / Số C/O ăn mẫu ECOSYS
 
       updateEcosysStats();
       applyEcosysFilter();
