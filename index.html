@@ -2216,6 +2216,7 @@
       ['export_declaration_date', 'Declaration date'],
       ['goods_total_fob_value', 'Total FOB value'],
       ['goods_total_quantity', 'Total quantity'],
+      ['goods_total_gross_weight', 'Total gross weight'],
       ['exporter_name', 'Exporter'],
       ['from_address_line1', 'Exporter address 1'],
       ['from_address_line2', 'Exporter address 2'],
@@ -2251,7 +2252,9 @@
     function ecoFmtTime(v) {
       if (!v) return '---';
       const t = new Date(v);
-      return isNaN(t) ? '---' : t.toLocaleString('vi-VN');
+      if (isNaN(t)) return '---';
+      const p = (n) => String(n).padStart(2, '0');
+      return `${p(t.getDate())}/${p(t.getMonth() + 1)}/${t.getFullYear()} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`;
     }
 
     // The portal reports the size in KB
@@ -2379,106 +2382,366 @@
     // Temporary layout: everything that is stored, readable. The final layout will be arranged later.
     function ecosysRenderDetail(d, goods, docs, rejections) {
       const view = document.getElementById('ecosys-detail-view');
-      const skip = new Set(['id', 'sig', 'fetched_at']);
-      const known = new Set(ECOSYS_DETAIL_LABELS.map(p => p[0]));
-      const fmt = (k, v) => {
-        if (v === null || v === undefined || v === '') return '---';
-        if (typeof v === 'boolean') return v ? 'Yes' : 'No';
-        if (ECOSYS_DETAIL_DATE_KEYS.has(k)) return ecoEsc(ecoFmtTime(v));
-        return ecoEsc(v);
+      const NONE = '---';
+      const E = ecoEsc;
+      const plain = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+      const byDate = (a, b) => String(a.created_date || '').localeCompare(String(b.created_date || ''));
+
+      // ---------- small formatters ----------
+      const val = (v) => (v === null || v === undefined || String(v).trim() === '') ? NONE : E(v);
+      const num = (v) => {
+        const n = Number(v);
+        return (v === null || v === undefined || v === '' || isNaN(n))
+          ? NONE
+          : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
       };
-      const fields = ECOSYS_DETAIL_LABELS.filter(p => p[0] in d)
-        .concat(Object.keys(d).filter(k => !known.has(k) && !skip.has(k)).map(k => [k, k]));
-
-      const kv = fields.map(p => `
+      const dateOnly = (v) => {
+        const t = v ? new Date(v) : null;
+        return (t && !isNaN(t)) ? E(formatDate(v)) : NONE;
+      };
+      const noInfo = (v) => v ? E(ecoFmtTime(v)) : '<span class="text-red-600 italic">No information</span>';
+      const field = (label, html) => `
         <div>
-          <div class="text-[10px] uppercase tracking-wide text-slate-400">${ecoEsc(p[1])}</div>
-          <div class="text-sm text-slate-800 break-words">${fmt(p[0], d[p[0]])}</div>
-        </div>`).join('');
-
+          <div class="text-[10px] uppercase tracking-wide text-slate-400">${E(label)}</div>
+          <div class="text-sm text-slate-800 break-words">${html}</div>
+        </div>`;
+      const card = (title, body) => `
+        <div class="rounded-lg border border-slate-200 p-4 mb-4">
+          ${title ? `<h3 class="text-sm font-bold text-slate-700 mb-3">${E(title)}</h3>` : ''}
+          ${body}
+        </div>`;
+      const box = (checked, label) => `
+        <label class="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" disabled ${checked ? 'checked' : ''} class="h-4 w-4">${E(label)}
+        </label>`;
       const th = 'py-2 px-3 whitespace-nowrap';
       const td = 'py-2 px-3 align-top';
+      const theadCls = 'bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200';
 
-      const goodsRows = goods.map(g => `
-        <tr class="border-b border-slate-100">
-          <td class="${td} text-slate-400">${g.line_no ?? ''}</td>
-          <td class="${td} font-mono whitespace-nowrap">${ecoEsc(g.exporting_hs_code || '---')}</td>
-          <td class="${td}">${ecoEsc(g.goods_description || '---')}</td>
-          <td class="${td} whitespace-nowrap">${g.quantity ?? '---'} ${ecoEsc(g.quantity_unit_txt || '')}</td>
-          <td class="${td} whitespace-nowrap">${g.amount ?? '---'} ${ecoEsc(g.currency || '')}</td>
-          <td class="${td} whitespace-nowrap">${ecoEsc(g.invoice_number || '---')}</td>
-          <td class="${td} whitespace-nowrap">${ecoEsc(g.origin_criterion || '---')}</td>
-        </tr>`).join('');
+      // ---------- weights ----------
+      // one goods line: ecosys.gov.vn keeps the text as shown on the portal, co.moit a number + unit
+      const weightOf = (g) => {
+        if (g.gross_weight_text) return String(g.gross_weight_text);
+        const n = Number(g.gross_weight);
+        return (n > 0) ? `${num(n)} ${g.gross_weight_unit_txt || ''}`.trim() : '';
+      };
+      const hasWeight = goods.some(g => weightOf(g) !== '');
+      // total: the portal's own total, else the sum of the lines (one sum per unit)
+      let totalWeight = d.goods_total_gross_weight || '';
+      if (!totalWeight) {
+        const sums = new Map();
+        goods.forEach(g => {
+          const n = Number(g.gross_weight);
+          if (n > 0) {
+            const u = String(g.gross_weight_unit_txt || '').trim();
+            sums.set(u, (sums.get(u) || 0) + n);
+          }
+        });
+        totalWeight = [...sums].map(([u, n]) => `${num(Math.round(n * 1000) / 1000)} ${u}`.trim()).join(' + ');
+      }
 
-      const docRows = docs.map(x => `
-        <tr class="border-b border-slate-100">
-          <td class="${td} whitespace-nowrap">${ecoFmtTime(x.created_date)}</td>
-          <td class="${td} text-blue-600 font-medium">${ecoEsc(x.ten_tai_lieu || '---')}</td>
-          <td class="${td}">${ecoEsc(x.loai_tai_lieu_txt || x.loai_tai_lieu || '---')}</td>
-          <td class="${td} whitespace-nowrap">${ecoFmtSize(x.kich_thuoc)}</td>
-          <td class="${td} whitespace-nowrap">${x.ngay_xoa_file ? ecoFmtTime(x.ngay_xoa_file) : '---'}</td>
-        </tr>`).join('');
+      // ---------- attached files ----------
+      // only files that are still there; the QR archive is ignored; the portal log repeats a file
+      // (same path), so each file is listed once and keeps the document label if any copy has it
+      const byPath = new Map();
+      docs
+        .filter(x => !x.ngay_xoa_file && x.loai_tai_lieu !== 'LuuTruQuetQR')
+        .sort(byDate)
+        .forEach(x => {
+          const k = x.duong_dan_file || `${x.loai_tai_lieu}|${x.ten_tai_lieu}`;
+          const prev = byPath.get(k);
+          if (!prev) byPath.set(k, x);
+          else if (!prev.loai_tai_lieu_txt && x.loai_tai_lieu_txt) byPath.set(k, Object.assign({}, prev, { loai_tai_lieu_txt: x.loai_tai_lieu_txt }));
+        });
+      const live = [...byPath.values()];
+      const DOC_LABEL = {
+        DOC_BL: 'Appendix table (BK)', DOC_KKHH: 'Appendix table (BK)', QUYTRINHSX: 'Production process (QTSX)',
+        DOC_CAMKETXUATXU: 'Origin commitment (PLX)', DOC_CHUNGTUKHAC: 'Other documents', ToKhaiHQNK: 'Invoice'
+      };
+      const labelOf = (x) => x.loai_tai_lieu_txt || DOC_LABEL[x.loai_tai_lieu] || x.loai_tai_lieu || NONE;
+      // ecosys.gov.vn files have a full web address (clickable); co.moit files only an internal path (name only)
+      const fileHtml = (x) => {
+        const name = E(x.ten_tai_lieu || NONE);
+        const u = String(x.duong_dan_file || '');
+        const inner = /^https?:\/\//i.test(u)
+          ? `<a href="${E(u)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">${name}</a>`
+          : `<span class="text-blue-600">${name}</span>`;
+        return `<div class="flex items-start gap-1.5 break-all"><span class="text-slate-400">&#128206;</span>${inner}</div>`;
+      };
 
+      // ---------- extra data (flags, third-country invoicing) ----------
+      let extra = {};
+      try { extra = d.data_json ? JSON.parse(d.data_json) : {}; } catch (e) { extra = {}; }
+      if (!extra || typeof extra !== 'object') extra = {};
+      const third = [];
+      if (extra.ThirdCountry) {
+        Object.keys(extra).filter(k => k.startsWith('ThirdCountry_')).forEach(k => {
+          if (extra[k] !== '' && extra[k] !== null && extra[k] !== undefined) {
+            third.push([k.replace(/^ThirdCountry_/, '').replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2'), String(extra[k])]);
+          }
+        });
+      }
+
+      // ---------- 1. status, rejection reason (above the fee line), dates ----------
+      const rejectedNow = /tu choi/.test(plain(d.trang_thai_txt));
       const rejHtml = rejections.length === 0 ? '' : `
-        <div class="mb-6">
-          <h3 class="text-sm font-bold text-red-700 mb-2">Rejections (${rejections.length})</h3>
-          <div class="space-y-2">
-            ${rejections.map(r => `
-              <div class="rounded-lg border border-red-200 bg-red-50 p-3">
-                <div class="text-xs text-red-700 font-semibold">${ecoFmtTime(r.ngay_xu_ly)} · ${ecoEsc(r.nguoi_xu_ly || '---')} · ${ecoEsc(r.hanh_dong || '---')}</div>
-                <div class="mt-1 text-sm text-red-900 whitespace-pre-line">${ecoEsc(r.ghi_chu || '---')}</div>
-              </div>`).join('')}
+        <div class="mb-3 space-y-2">
+          ${rejections.slice().sort((a, b) => String(b.ngay_xu_ly || '').localeCompare(String(a.ngay_xu_ly || ''))).map(r => `
+            <div class="rounded-lg border ${rejectedNow ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'} p-3">
+              <div class="text-xs font-semibold ${rejectedNow ? 'text-red-700' : 'text-amber-700'}">${rejectedNow ? 'Rejection reason' : 'Earlier rejection'} · ${E(ecoFmtTime(r.ngay_xu_ly))} · ${E(r.nguoi_xu_ly || NONE)}</div>
+              <div class="mt-1 text-sm ${rejectedNow ? 'text-red-900' : 'text-amber-900'} whitespace-pre-line">${E(r.ghi_chu || NONE)}</div>
+            </div>`).join('')}
+        </div>`;
+      const fee = d.is_nop_phi === true
+        ? '<span class="text-emerald-600 font-semibold">&#10003; Paid</span>'
+        : (d.is_nop_phi === false ? 'Not paid' : NONE);
+      const statusCard = card('', `
+        ${rejHtml}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          ${field('Fee paid', fee)}
+          <div></div>
+          ${field('E-approval date', noInfo(d.cv_ngay_duyet_dien_tu))}
+          ${field('C/O issued on', noInfo(d.cv_ngay_cap_phep_co))}
+          ${field('C/O No.', `<span class="font-bold text-blue-600">${val(d.so_hieu_cap_phep_co)}</span>`)}
+          ${field('C/O number issued on', noInfo(d.ngay_cap_so_co))}
+          ${field('Receipt No.', val(d.so_tiep_nhan))}
+          ${field('Filed on', noInfo(d.ngay_khai_co))}
+        </div>`);
+
+      // ---------- 2. general data + export declarations (number, date, file) ----------
+      const nums = String(d.export_declaration_number || '').split(',').map(s => s.trim()).filter(Boolean);
+      const decDates = String(d.export_declaration_date || '').split(',').map(s => s.trim());
+      const declRows = nums.map((n, i) => {
+        const files = live.filter(x => x.loai_tai_lieu === 'ToKhaiXuatKhau_' + i);
+        return `
+          <tr class="border-b border-slate-100">
+            <td class="${td} text-slate-400">${i + 1}</td>
+            <td class="${td} font-mono">${E(n)}</td>
+            <td class="${td} whitespace-nowrap">${val(decDates[i])}</td>
+            <td class="${td}">${files.length ? files.map(fileHtml).join('') : NONE}</td>
+          </tr>`;
+      }).join('');
+      const generalCard = card('', `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="space-y-3">
+            ${field('Tax code', val(d.tax_code))}
+            ${field('Issuing authority', val(d.issuing_authority))}
+            ${field('Form', val(d.form_txt))}
+            ${field('Importing country', val(d.importing_country))}
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-slate-400 mb-1">Export declarations</div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="${theadCls}"><tr><th class="${th}">#</th><th class="${th}">Declaration No.</th><th class="${th}">Date</th><th class="${th}">Attached file</th></tr></thead>
+                <tbody>${declRows || `<tr><td colspan="4" class="py-3 text-center text-slate-400">No declarations.</td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>`);
+
+      // ---------- 3. consigned from / to ----------
+      const partiesHtml = `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-4">
+          ${card('Goods consigned from', `<div class="space-y-3">
+            ${field("Exporter's business name", val(d.exporter_name))}
+            ${field('Address line 1', val(d.from_address_line1))}
+            ${field('Address line 2', val(d.from_address_line2))}
+          </div>`)}
+          ${card('Goods consigned to', `<div class="space-y-3">
+            ${field("Consignee's name", val(d.consignee_name))}
+            ${field('Address line 1', val(d.to_address_line1))}
+            ${field('Address line 2', val(d.to_address_line2))}
+          </div>`)}
+        </div>`;
+
+      // ---------- 4. transport and route ----------
+      const bills = live.filter(x => x.loai_tai_lieu === 'TRANSPORT_DOC');
+      const transportCard = card('Means of transport and route', `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
+          <div class="space-y-3">
+            ${field('Transportation type', val(d.transportation_type))}
+            ${field('Port of loading', val(d.port_of_loading))}
+            ${field('Port of discharge', val(d.port_of_discharge))}
+          </div>
+          <div class="space-y-3">
+            ${field("Vessel's name / aircraft etc.", val(d.transport_name))}
+            ${field('Transportation document attached', bills.length ? bills.map(fileHtml).join('') : NONE)}
+            ${field('Departure date', dateOnly(d.departure_date))}
+            ${field('Bill No.', val(d.bill))}
+          </div>
+        </div>`);
+
+      // ---------- 5. goods (HS: the importing country's code, else the exporting one) ----------
+      const goodsRows = goods.map(g => {
+        const hs = g.importing_hs_code || g.exporting_hs_code;
+        return `
+          <tr class="border-b border-slate-100">
+            <td class="${td} text-slate-400">${g.line_no ?? ''}</td>
+            <td class="${td} whitespace-nowrap">${val(g.mark_and_number)}</td>
+            <td class="${td}">${val(g.goods_description)}${hs ? `<div class="mt-0.5 font-mono text-slate-500">${E(hs)}</div>` : ''}</td>
+            <td class="${td} whitespace-nowrap">${val(g.origin_criterion)}${g.origin_criterion_value ? `<div class="text-slate-500">${E(g.origin_criterion_value)}</div>` : ''}</td>
+            <td class="${td} whitespace-nowrap">${num(g.quantity)} ${E(g.quantity_unit_txt || '')}</td>
+            ${hasWeight ? `<td class="${td} whitespace-nowrap">${E(weightOf(g) || NONE)}</td>` : ''}
+            <td class="${td} whitespace-nowrap">${num(g.amount)} ${E(g.currency || '')}</td>
+            <td class="${td} whitespace-nowrap">${val(g.invoice_number)}${g.invoice_date ? `<div class="text-slate-500">${dateOnly(g.invoice_date)}</div>` : ''}</td>
+          </tr>`;
+      }).join('');
+      const goodsCard = card(`Goods (${goods.length})`, `
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="${theadCls}">
+              <tr>
+                <th class="${th}">No.</th><th class="${th}">Marks and numbers</th><th class="${th}">Description / HS code</th>
+                <th class="${th}">Origin criterion</th><th class="${th}">Quantity</th>${hasWeight ? `<th class="${th}">Gross weight</th>` : ''}
+                <th class="${th}">Value</th><th class="${th}">Invoice No. / date</th>
+              </tr>
+            </thead>
+            <tbody>${goodsRows || `<tr><td colspan="8" class="py-4 text-center text-slate-400">No goods lines.</td></tr>`}</tbody>
+          </table>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-3">
+          ${field('Total value', `<span class="font-semibold">${val(d.goods_total_fob_value)}</span>`)}
+          ${field('Total quantity', `<span class="font-semibold">${val(d.goods_total_quantity)}</span>`)}
+          ${field('Total gross weight', `<span class="font-semibold">${val(totalWeight)}</span>`)}
+          <div class="flex items-end">${box(d.goods_is_show_fob_value === true, 'Show FOB value on C/O')}</div>
+        </div>`);
+
+      // ---------- 6. documents: origin proof | invoices ----------
+      const ORIGIN_TYPES = ['DOC_BL', 'DOC_KKHH', 'QUYTRINHSX', 'DOC_CAMKETXUATXU', 'DOC_CHUNGTUKHAC'];
+      const origin = live
+        .filter(x => ORIGIN_TYPES.includes(x.loai_tai_lieu))
+        .sort((a, b) => ORIGIN_TYPES.indexOf(a.loai_tai_lieu) - ORIGIN_TYPES.indexOf(b.loai_tai_lieu));
+      const invoices = live.filter(x => x.loai_tai_lieu === 'ToKhaiHQNK');
+      const others = live.filter(x => {
+        const t = String(x.loai_tai_lieu || '');
+        if (t === 'TRANSPORT_DOC' || t === 'ToKhaiHQNK' || ORIGIN_TYPES.includes(t)) return false;
+        if (t.startsWith('ToKhaiXuatKhau_')) return parseInt(t.split('_')[1], 10) >= nums.length;
+        return true;
+      });
+      // one row per document type: all the files of that type share one cell
+      const groupDocs = (list) => {
+        const groups = new Map();
+        list.forEach(x => {
+          const key = x.loai_tai_lieu === 'DOC_KKHH' ? 'DOC_BL' : x.loai_tai_lieu;
+          if (!groups.has(key)) groups.set(key, { loai_tai_lieu: key, loai_tai_lieu_txt: '', files: [] });
+          const g = groups.get(key);
+          if (!g.loai_tai_lieu_txt && x.loai_tai_lieu_txt) g.loai_tai_lieu_txt = x.loai_tai_lieu_txt;
+          g.files.push(x);
+        });
+        return [...groups.values()];
+      };
+      const docTable = (title, list) => `
+        <div class="rounded-lg border border-slate-200 p-4">
+          <h3 class="text-sm font-bold text-slate-700 mb-2">${E(title)}</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="${theadCls}"><tr><th class="${th}">No.</th><th class="${th}">Document</th><th class="${th}">Attached file</th></tr></thead>
+              <tbody>${groupDocs(list).map((x, i) => `
+                <tr class="border-b border-slate-100">
+                  <td class="${td} text-slate-400">${i + 1}</td>
+                  <td class="${td}">${E(labelOf(x))}</td>
+                  <td class="${td}">${x.files.map(fileHtml).join('')}</td>
+                </tr>`).join('') || `<tr><td colspan="3" class="py-3 text-center text-slate-400">No files.</td></tr>`}</tbody>
+            </table>
           </div>
         </div>`;
+      const documentsHtml = `
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+          ${docTable('Document proving the origin status attached', origin)}
+          ${docTable('Invoice attached', invoices)}
+        </div>
+        ${others.length ? `<div class="mb-4">${docTable('Other attachments', others)}</div>` : ''}`;
+
+      // ---------- 7. import declaration / invoice VAT (not collected), notes, flags ----------
+      const importCard = card('Import declaration / Invoice VAT (not collected)', `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-3">
+          ${field('Import declaration number', NONE)}${field('Date', NONE)}${field('Import declaration attached', NONE)}
+          ${field('Invoice VAT number', NONE)}${field('Date', NONE)}${field('Invoice VAT attached', NONE)}
+        </div>`);
+      const miscCard = card('', `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
+          <div class="space-y-3 lg:col-span-2">
+            ${field('Declaration place', val(d.declaration_place))}
+            ${field('Remarks', `<span class="whitespace-pre-line">${val(d.remarks)}</span>`)}
+          </div>
+        </div>
+        <div class="mt-4 space-y-2">
+          ${box(extra.IssuedRetroactively === true, 'Issued Retrospectively')}
+          ${box(false, 'DUPLICATE')}
+          ${box(false, 'Application of Article 3(7) of Protocol 1 to the Viet Nam - EU FTA')}
+          ${box(false, 'OTHERS')}
+        </div>`);
+      const thirdCard = extra.ThirdCountry ? card('Third-country invoicing', third.length
+        ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">${third.map(([k, v]) => field(k, E(v))).join('')}</div>`
+        : '<div class="text-sm text-slate-700">Yes</div>') : '';
+
+      // ---------- 8. manufacture ----------
+      const manuCard = card('Manufacture', `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
+          ${field("Manufacture's name", val(d.manu_name))}
+          ${field('Address line 1', val(d.manu_address_line1))}
+          <div></div>
+          ${field('Address line 2', val(d.manu_address_line2))}
+        </div>`);
+
+      // ---------- 9. folded: the document log ----------
+
+      const logMap = new Map();
+      docs
+        .filter(x => x.loai_tai_lieu !== 'LuuTruQuetQR')
+        .sort(byDate)
+        .forEach(x => {
+          const k = (x.duong_dan_file || `${x.loai_tai_lieu}|${x.ten_tai_lieu}`) + '|' + (x.ngay_xoa_file || '');
+          const prev = logMap.get(k);
+          if (!prev) logMap.set(k, x);
+          else if (!prev.loai_tai_lieu_txt && x.loai_tai_lieu_txt) logMap.set(k, Object.assign({}, prev, { loai_tai_lieu_txt: x.loai_tai_lieu_txt }));
+        });
+      const logList = [...logMap.values()];
+      const logRows = logList.map(x => `
+        <tr class="border-b border-slate-100">
+          <td class="${td} whitespace-nowrap">${E(ecoFmtTime(x.created_date))}</td>
+          <td class="${td} font-medium ${x.ngay_xoa_file ? 'text-slate-400 line-through' : 'text-blue-600'}"${x.ngay_xoa_file ? ` title="Deleted ${E(ecoFmtTime(x.ngay_xoa_file))}"` : ''}>${val(x.ten_tai_lieu)}</td>
+          <td class="${td}">${E(labelOf(x))}</td>
+          <td class="${td} whitespace-nowrap">${E(ecoFmtSize(x.kich_thuoc))}</td>
+        </tr>`).join('');
 
       view.innerHTML = `
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-200">
           <div class="flex items-center gap-3 flex-wrap">
-            <span class="text-lg font-bold text-slate-800">${ecoEsc(d.so_tiep_nhan || '---')}</span>
-            <span class="font-bold text-blue-600">${ecoEsc(d.so_hieu_cap_phep_co || '---')}</span>
+            <span class="text-lg font-bold text-slate-800">${val(d.so_tiep_nhan)}</span>
+            <span class="font-bold text-blue-600">${val(d.so_hieu_cap_phep_co)}</span>
             ${ecosysStatusBadge(d.trang_thai_txt)}
           </div>
           <button onclick="ecosysSetMode('data')"
             class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition">&larr; Back to Data ECOSYS</button>
         </div>
-
-        ${rejHtml}
-
-        <div class="mb-6">
-          <h3 class="text-sm font-bold text-slate-700 mb-3">Detail</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-3">${kv}</div>
+        <div class="flex justify-center mb-5">
+          <h2 class="inline-block pb-1 border-b-2 border-slate-300 text-center text-base font-bold tracking-wide ${rejectedNow ? 'text-red-700' : 'text-slate-800'}">TRẠNG THÁI HỒ SƠ: ${E(String(d.trang_thai_txt || NONE).toUpperCase())}</h2>
         </div>
-
-        <div class="mb-6">
-          <h3 class="text-sm font-bold text-slate-700 mb-2">Goods (${goods.length})</h3>
-          <div class="overflow-x-auto">
+        ${statusCard}
+        ${generalCard}
+        ${partiesHtml}
+        ${transportCard}
+        ${goodsCard}
+        ${documentsHtml}
+        ${importCard}
+        ${miscCard}
+        ${thirdCard}
+        ${manuCard}
+        <details class="mb-2 rounded-lg border border-slate-200 p-4">
+          <summary class="cursor-pointer text-sm font-bold text-slate-700">Document log (${logList.length})</summary>
+          <div class="mt-3 overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
-              <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
-                <tr>
-                  <th class="${th}">No.</th><th class="${th}">HS code</th><th class="${th}">Description</th>
-                  <th class="${th}">Quantity</th><th class="${th}">Value</th><th class="${th}">Invoice No.</th><th class="${th}">Origin criterion</th>
-                </tr>
+              <thead class="${theadCls}">
+                <tr><th class="${th}">Uploaded</th><th class="${th}">File name</th><th class="${th}">Document</th><th class="${th}">Size</th></tr>
               </thead>
-              <tbody>${goodsRows || '<tr><td colspan="7" class="py-4 text-center text-slate-400">No goods lines.</td></tr>'}</tbody>
+              <tbody>${logRows || `<tr><td colspan="5" class="py-4 text-center text-slate-400">No documents.</td></tr>`}</tbody>
             </table>
           </div>
-        </div>
-
-        <div class="mb-2">
-          <h3 class="text-sm font-bold text-slate-700 mb-2">Documents (${docs.length})</h3>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
-                <tr>
-                  <th class="${th}">Uploaded</th><th class="${th}">File name</th><th class="${th}">Document type</th>
-                  <th class="${th}">Size</th><th class="${th}">Deleted</th>
-                </tr>
-              </thead>
-              <tbody>${docRows || '<tr><td colspan="5" class="py-4 text-center text-slate-400">No documents.</td></tr>'}</tbody>
-            </table>
-          </div>
-        </div>`;
+        </details>`;
     }
+
 
 const DOCS_INV_SPECIAL = ['B', 'D', 'E', 'AI'];       // forms whose INV files are named _INV and number (declarations + 1)
 const DOCS_NO_PLX = ['B', 'D', 'UAE-VN'];             // forms that never need a PLX
@@ -2508,17 +2771,36 @@ function docsKind(r) {
   return null;
 }
 
-// Names that belong to a specific document type (ECIS..._B / _BK / _QTSX / _PLX / _<number> / _INV)
+// Names that belong to a specific document type (ECIS..._B / _FCR / _BK / _QTSX / _PLX / _<number> / _INV / -INV / TKN+VAT)
+const DOCS_BKTL = 'Other documents (BK Tru lui)';       // "BK Tru lui" files are ordinary "Other documents"
+
+function docsPlain(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd');
+}
+
 function docsLooksLike(name) {
-  const m = /^ECIS\d+_(.*)$/i.exec(name || '');
+  if (/^(ECIS\d+[A-Za-z0-9]*_)?TKN\+VAT/i.test(name || '')) return 'TKN+VAT';
+  const m = /^ECIS\d+[A-Za-z0-9]*([_-])(.*)$/i.exec(name || '');
   if (!m) return null;
-  const rest = m[1];
-  if (/^BK/i.test(rest)) return 'BK';
-  if (/^QTSX/i.test(rest)) return 'QTSX';
-  if (/^PLX/i.test(rest)) return 'PLX';
-  if (/^B(?![0-9A-Za-z])/i.test(rest)) return 'Bill';
-  if (/^\d/.test(rest) || /_INV/i.test(name)) return 'INV';
+  const rest = m[2];
+  if (m[1] === '_') {
+    if (/^BK[\s_-]*TRU[\s_-]*LUI/i.test(docsPlain(rest))) return DOCS_BKTL;
+    if (/^BK/i.test(rest)) return 'BK';
+    if (/^QTSX/i.test(rest)) return 'QTSX';
+    if (/^PLX/i.test(rest)) return 'PLX';
+    if (/^B(?![0-9A-Za-z])/i.test(rest) || /^FCR/i.test(rest)) return 'Bill';
+    if (/^\d/.test(rest)) return 'INV';
+  }
+  if (/[_-]INV/i.test(name)) return 'INV';
   return null;
+}
+
+// ecosys.gov.vn keeps file names in lower case with "-" instead of "_" (ecis552543-07982.pdf):
+// bring them to the co.moit shape (ECIS552543_07982.pdf, TKN+VAT) so the same rules apply
+function docsCanonE2(name) {
+  return String(name || '')
+    .replace(/^(ecis\d+[a-z0-9]*?)[-_]/i, (m, e) => e.toUpperCase() + '_')
+    .replace(/^((?:ECIS\d+[A-Za-z0-9]*_)?)tkn[-+_ ]?vat/i, (m, pre) => pre + 'TKN+VAT');
 }
 
 function docsFmtPart(label, have, need, counted) {
@@ -2527,6 +2809,7 @@ function docsFmtPart(label, have, need, counted) {
 }
 
 function docsEvaluate(rec, rows) {
+  if (rec.e2) rows = rows.map(r => Object.assign({}, r, { _orig: r.ten_tai_lieu, ten_tai_lieu: docsCanonE2(r.ten_tai_lieu) }));
   const D = rec.decls;
   const k = D.length;
   const ecisList = rec.ecis;
@@ -2596,7 +2879,7 @@ function docsEvaluate(rec, rows) {
     const m = docsDeclIndex(r.loai_tai_lieu);
     if (m !== null && typeCount[m] > 1 && !dState.get(r)) dState.set(r, `${typeCount[m]} files share type _${m}`);
   });
-  dLive.forEach(r => ev.files.push({ name: r.ten_tai_lieu || '', label: 'Declaration', reason: dState.get(r) || null }));
+  dLive.forEach(r => ev.files.push({ name: r._orig || r.ten_tai_lieu || '', label: 'Declaration', reason: dState.get(r) || null }));
   const declGood = dLive.filter(r => !dState.get(r)).length;
   ev.parts.push(docsFmtPart('Declaration', declGood, k, true));
 
@@ -2607,32 +2890,39 @@ function docsEvaluate(rec, rows) {
     return kd && kd !== 'DECL';
   });
   const parsed = (name) => {
-    const m = /^(ECIS\d+)_(.*)$/i.exec(name || '');
+    const m = /^(ECIS\d+[A-Za-z0-9]*)_(.*)$/i.exec(name || '');
     return m ? { pre: m[1].toUpperCase(), rest: m[2] } : { pre: null, rest: name || '' };
   };
   const isPdf = (name) => /\.pdf$/i.test(name || '');
   const restOk = {
-    Bill: (s) => /^B(?![0-9A-Za-z])/i.test(s),     // exactly "_B", not _BK / _BL / _B2
+    Bill: (s) => /^B(?![0-9A-Za-z])/i.test(s) || /^FCR/i.test(s),     // "_B" exactly (not _BK / _BL / _B2), or "_FCR..."
     BK: (s) => /^BK/i.test(s),
     QTSX: (s) => /^QTSX/i.test(s),
     PLX: (s) => /^PLX/i.test(s)
   };
-  const hint = { Bill: '_B', BK: '_BK', QTSX: '_QTSX', PLX: '_PLX' };
+  const hintText = {
+    Bill: 'ECIS…_B….pdf or ECIS…_FCR….pdf',
+    BK: 'ECIS…_BK….pdf',
+    QTSX: 'ECIS…_QTSX….pdf',
+    PLX: 'ECIS…_PLX….pdf'
+  };
   const labelOf = { INV: 'INV', Bill: 'Bill', BK: 'BK', QTSX: 'QTSX', PLX: 'PLX', TKN: 'TKN+VAT' };
   const oState = new Map();
   const valid = { INV: [], Bill: [], BK: [], QTSX: [], PLX: [], TKN: [] };
   const wrong = { INV: 0, Bill: 0, BK: 0, QTSX: 0, PLX: 0, TKN: 0 };
+  let invTagged = 0;                                                   // INV files named _INV / -INV
 
   others.forEach(r => {
     const kind = docsKind(r);
     const name = r.ten_tai_lieu || '';
     const p = parsed(name);
     if (kind === 'TKN') {
-      const main = /^(ECIS\d+_)?TKN\+VAT/i.test(name) && isPdf(name);
+      const main = /^(ECIS\d+[A-Za-z0-9]*_)?TKN\+VAT/i.test(name) && isPdf(name);
       if (!main) {
         // any name is fine here, except the names that belong to the other document types
         const lookalike = docsLooksLike(name);
-        oState.set(r, { label: 'Other', reason: lookalike ? `Wrong upload: this name belongs to ${lookalike}, not to "Other documents"` : null });
+        const allowedHere = !lookalike || lookalike === 'TKN+VAT' || lookalike === DOCS_BKTL;
+        oState.set(r, { label: 'Other', reason: allowedHere ? null : `Wrong upload: this name belongs to ${lookalike}, not to "Other documents"` });
         return;
       }
       if (p.pre && !ecisUp.includes(p.pre)) {
@@ -2644,27 +2934,44 @@ function docsEvaluate(rec, rows) {
       valid.TKN.push(r);
       return;
     }
+    if (kind === 'INV') {
+      // ECIS..._<number>..pdf, or a name with _INV / -INV (any form)
+      const pi = /^(ECIS\d+[A-Za-z0-9]*)([_-])(.*)$/i.exec(name);
+      let reasonI = null;
+      if (!isPdf(name)) reasonI = 'Wrong upload: the file must be a .pdf';
+      else if (docsLooksLike(name) && docsLooksLike(name) !== 'INV') reasonI = `Wrong upload: this name belongs to ${docsLooksLike(name)}, not to INV`;
+      else if (!pi) reasonI = `Wrong upload: the name must start with ${ecisList[0]}_`;
+      else if (!ecisUp.includes(pi[1].toUpperCase())) reasonI = `Wrong upload: ECIS in the name (${pi[1].toUpperCase()}) differs from the record (${ecisTxt})`;
+      else {
+        const tagged = special && /[_-]INV/i.test(name);          // _INV / -INV only count on forms B, D, E, AI
+        const numeric = pi[2] === '_' && /^\d/.test(pi[3]);
+        if (!tagged && !numeric) reasonI = special ? 'Wrong upload: the name must be ECIS…_<number>….pdf or contain _INV / -INV' : 'Wrong upload: the name must be ECIS…_<number>….pdf (_INV / -INV are only for forms B, D, E, AI)';
+        else if (tagged) invTagged++;
+      }
+      oState.set(r, { label: 'INV', reason: reasonI });
+      if (reasonI) wrong.INV++;
+      else valid.INV.push(r);
+      return;
+    }
     let reason = null;
     if (!isPdf(name)) reason = 'Wrong upload: the file must be a .pdf';
+    else if (docsLooksLike(name) && docsLooksLike(name) !== labelOf[kind]) reason = `Wrong upload: this name belongs to ${docsLooksLike(name)}, not to ${labelOf[kind]}`;
     else if (!p.pre) reason = `Wrong upload: the name must start with ${ecisList[0]}_`;
     else if (!ecisUp.includes(p.pre)) reason = `Wrong upload: ECIS in the name (${p.pre}) differs from the record (${ecisTxt})`;
-    else if (kind === 'INV') {
-      const okName = special ? /_INV/i.test(name) : /^\d/.test(p.rest);
-      if (!okName) reason = special ? 'Wrong upload: the name must contain _INV' : 'Wrong upload: the name must be ECIS…_<number>….pdf';
-    } else if (!restOk[kind](p.rest)) {
-      reason = `Wrong upload: the name must be ECIS…${hint[kind]}….pdf`;
-    }
+    else if (!restOk[kind](p.rest)) reason = `Wrong upload: the name must be ${hintText[kind]}`;
     oState.set(r, { label: labelOf[kind], reason });
     if (reason) wrong[kind]++;
     else valid[kind].push(r);
   });
 
-  // INV: one per declaration (forms B, D, E, AI: declarations + 1)
+  // INV: one per declaration; forms B, D, E, AI: declarations + 1, and one of them must be an _INV file
   const invNeed = special ? k + 1 : k;
   const invHave = valid.INV.length;
-  if (invHave < invNeed) ev.missing.push({ label: 'INV', reason: `Missing INV: ${invHave} of ${invNeed} found` });
+  const noInvFile = special && invTagged === 0;
+  if (invHave < invNeed && !(noInvFile && invHave === invNeed - 1)) ev.missing.push({ label: 'INV', reason: `Missing INV: ${invHave} of ${invNeed} found` });
+  if (noInvFile) ev.missing.push({ label: 'INV', reason: 'Missing _INV file: forms B, D, E, AI need an ECIS…_INV….pdf or ECIS…-INV….pdf in addition to the invoices' });
   if (invHave > invNeed) valid.INV.forEach(r => { oState.get(r).reason = `Excess INV: ${invHave} found, ${invNeed} expected`; });
-  ev.parts.push(docsFmtPart('INV', invHave, invNeed, true));
+  ev.parts.push(docsFmtPart('INV', invHave, invNeed, true) + (noInvFile ? ' (no _INV)' : ''));
 
   // Bill / BK / QTSX: exactly one file
   ['Bill', 'BK', 'QTSX'].forEach(kind => {
@@ -2703,7 +3010,7 @@ function docsEvaluate(rec, rows) {
 
   others.forEach(r => {
     const s = oState.get(r);
-    ev.files.push({ name: r.ten_tai_lieu || '', label: s.label, reason: s.reason });
+    ev.files.push({ name: r._orig || r.ten_tai_lieu || '', label: s.label, reason: s.reason });
   });
   ev.files.sort((a, b) => ((DOCS_LABEL_ORDER[a.label] ?? 9) - (DOCS_LABEL_ORDER[b.label] ?? 9)) || a.name.localeCompare(b.name));
   ev.ok = ev.missing.length === 0 && ev.files.every(f => !f.reason);
@@ -2711,6 +3018,7 @@ function docsEvaluate(rec, rows) {
 }
 
 // ---------- Docs detail: list + popup ----------
+const DOCS_CHECK_FROM_E2 = '2026-10-14';              // ecosys.gov.vn records (ids start with e2_) are checked from this date
 const DOCS_CHECK_FROM = '2026-10-16';                 // records filed on/after this date are checked; older ones stay grey
 const DOCS_BTN_BASE = 'px-4 py-2 rounded-lg border text-sm font-semibold transition';
 let docsRecords = [];
@@ -2731,7 +3039,7 @@ function docsIsCancelled(status) {
 function docsBuildDeclToEcis() {
   const map = new Map();
   (globalData || []).forEach(item => {
-    const em = /ECIS\d+/i.exec(item.folder_name || '');
+    const em = /ECIS\d+[A-Za-z0-9]*/i.exec(item.folder_name || '');
     if (!em) return;
     const ecis = em[0].toUpperCase();
     const decl = extractDeclarationNumbers(item.xls_list);
@@ -2779,10 +3087,11 @@ async function docsFetchAll() {
       sotn: d.so_tiep_nhan,
       co: d.so_hieu_cap_phep_co,
       form: normMauCo(d.form_txt),
+      e2: String(d.id).startsWith('e2_'),
       decls: decls,
       ecis: [...set].sort(),
       ngay: d.ngay_khai_co || '',
-      checked: day !== '' && day >= DOCS_CHECK_FROM,
+      checked: day !== '' && day >= (String(d.id).startsWith('e2_') ? DOCS_CHECK_FROM_E2 : DOCS_CHECK_FROM),
       eval: null,
       view: null
     });
@@ -2913,7 +3222,7 @@ function ecosysDocsApply(reset) {
   issuesInfo.innerText = `Issues: ${issues} / ${checked.length} checked`;
   info.innerText = total === 0 ? '0 records' : `Showing ${from + 1} - ${from + pageData.length} of ${total} records`;
   note.innerText = (docsSkipped ? `${docsSkipped} ${docsSkipped === 1 ? 'record is' : 'records are'} not listed (no ECIS found for its declaration numbers). ` : '')
-    + `Records filed before ${DOCS_CHECK_FROM.split('-').reverse().join('/')} are not checked.`;
+    + `Records filed before ${DOCS_CHECK_FROM.split('-').reverse().join('/')} (ecosys.gov.vn: ${DOCS_CHECK_FROM_E2.split('-').reverse().join('/')}) are not checked.`;
   renderPager('ecosys-docs-pagination', ecosysDocsPage, totalPages, 'changeEcosysDocsPage');
 }
 
@@ -3259,7 +3568,10 @@ async function ecosysDocsSetPlx(ecis, needed) {
 
     function formatDate(dateStr) {
       if (!dateStr) return '---';
-      return new Date(dateStr).toLocaleDateString('vi-VN');
+      const t = new Date(dateStr);
+      if (isNaN(t)) return '---';
+      const p = (n) => String(n).padStart(2, '0');
+      return `${p(t.getDate())}/${p(t.getMonth() + 1)}/${t.getFullYear()}`;
     }
 
   async function triggerEcosysBotImmediately() {
