@@ -762,7 +762,7 @@
   <script>
    // ---------------- CẤU HÌNH SUPABASE CLIENT (CHUẨN LOCAL & NGROK) ----------------
     const SUPABASE_URL = "https://carrousel-liking-mannish.ngrok-free.dev";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkyNDYxNDA1LCJleHAiOjIxMDc4MjE0MDV9.dr-5AcqvQSujNgV-8bGwLMu_cuXn-3eQnx6fHRwwkVg";
     
     
     // Tắt hoàn toàn Realtime WebSocket để tránh bị Browser chặn kết nối Local Network
@@ -771,7 +771,7 @@
         timeout: 0,
         params: { eventsPerSecond: 0 }
       },
-      auth: { persistSession: false },
+      auth: { persistSession: true, autoRefreshToken: true },
       global: {
         headers: {
           'ngrok-skip-browser-warning': 'true'
@@ -2142,8 +2142,14 @@
 
 
     // Tải dữ liệu ban đầu: map ECOSYS (số C/O) + CO TRACKING
-    fetchEcosysData();
-    fetchData();
+    // Only when somebody is signed in: the data is closed to everyone else (the login form is shown instead)
+    supabaseClient.auth.getSession().then(({ data }) => {
+      if (data && data.session) {
+        fetchEcosysData();
+        fetchData();
+      }
+    }).catch(() => {});
+
 
     // ---------------- LOGIC TRUY VẤN ECOSYS 11 CỘT ----------------
     function countEcosysStatus(status) {
@@ -2247,6 +2253,29 @@
 
     function ecoEsc(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Reference data copied from the portal by scrape_reference.js: the options of each C/O form, country names...
+    let ecoRef = null;
+    async function ecoLoadReference() {
+      if (ecoRef) return ecoRef;
+      try {
+        const [a, f, c] = await Promise.all([
+          supabaseClient.from('co_attributes').select('*').order('sort_order', { ascending: true }),
+          supabaseClient.from('co_form_attributes').select('*'),
+          supabaseClient.from('co_dropdown').select('*').range(0, 999)
+        ]);
+        const err = a.error || f.error || c.error;
+        if (err) throw err;
+        ecoRef = {
+          attrs: a.data || [],
+          forms: new Map((f.data || []).map(r => [String(r.form_code).toUpperCase(), r.attributes])),
+          dropdown: new Map((c.data || []).map(r => [String(r.value).toUpperCase(), r.label]))
+        };
+      } catch (e) {
+        console.warn('Reference data is not available yet (run scrape_reference.js):', e.message || e);
+      }
+      return ecoRef;
     }
 
     function ecoFmtTime(v) {
@@ -2373,6 +2402,7 @@
         if (gRes.error) throw gRes.error;
         if (docRes.error) throw docRes.error;
         if (rejRes.error) throw rejRes.error;
+        await ecoLoadReference();
         ecosysRenderDetail(d, gRes.data || [], docRes.data || [], rejRes.data || []);
       } catch (e) {
         view.innerHTML = `<div class="text-sm text-red-600">Failed to load detail: ${ecoEsc(e.message || e)}</div>`;
@@ -2473,14 +2503,6 @@
       let extra = {};
       try { extra = d.data_json ? JSON.parse(d.data_json) : {}; } catch (e) { extra = {}; }
       if (!extra || typeof extra !== 'object') extra = {};
-      const third = [];
-      if (extra.ThirdCountry) {
-        Object.keys(extra).filter(k => k.startsWith('ThirdCountry_')).forEach(k => {
-          if (extra[k] !== '' && extra[k] !== null && extra[k] !== undefined) {
-            third.push([k.replace(/^ThirdCountry_/, '').replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2'), String(extra[k])]);
-          }
-        });
-      }
 
       // ---------- 1. status, rejection reason (above the fee line), dates ----------
       const rejectedNow = /tu choi/.test(plain(d.trang_thai_txt));
@@ -2666,15 +2688,51 @@
             ${field('Remarks', `<span class="whitespace-pre-line">${val(d.remarks)}</span>`)}
           </div>
         </div>
-        <div class="mt-4 space-y-2">
-          ${box(extra.IssuedRetroactively === true, 'Issued Retrospectively')}
-          ${box(false, 'DUPLICATE')}
-          ${box(false, 'Application of Article 3(7) of Protocol 1 to the Viet Nam - EU FTA')}
-          ${box(false, 'OTHERS')}
-        </div>`);
-      const thirdCard = extra.ThirdCountry ? card('Third-country invoicing', third.length
-        ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">${third.map(([k, v]) => field(k, E(v))).join('')}</div>`
-        : '<div class="text-sm text-slate-700">Yes</div>') : '';
+        `);
+
+      // ---------- 7b. the options of this C/O form (checkboxes + their sub-fields), as the portal configures them ----------
+      const ref = ecoRef || { attrs: [], forms: new Map(), dropdown: new Map() };
+      const attrOf = new Map(ref.attrs.map(a => [a.attribute, a]));
+      const attrOrder = new Map(ref.attrs.map((a, i) => [a.attribute, i]));
+      const splitCfg = (s) => String(s || '').split(/[,;|\s]+/).filter(Boolean);
+      const guessCode = (txt) => {                      // only for records stored before form_code existed
+        const c = String(txt || '').replace(/^M\S+\s+/i, '').trim().toUpperCase();
+        if (/^EUR\.?1\s*UK$/.test(c)) return 'EUR1UK';
+        if (/^EUR\.?1$/.test(c)) return 'EUR';
+        return c.replace(/[^A-Z0-9]/g, '');
+      };
+      const formCode = String(d.form_code || guessCode(d.form_txt)).toUpperCase();
+      // old portal (ecosys.gov.vn): the options its page shows (kept in _options), else the same options as form AI
+      let optionList = String(d.id || '').startsWith('e2_')
+        ? (Array.isArray(extra._options) ? extra._options.slice() : splitCfg(ref.forms.get('AI')))
+        : splitCfg(ref.forms.get(formCode));
+      // a ticked option that the list does not mention is still shown
+      Object.keys(extra).forEach(k => {
+        const a = attrOf.get(k);
+        if (a && a.type === 'CheckBox' && extra[k] === true && !optionList.includes(k)) optionList.push(k);
+      });
+      optionList = optionList
+        .filter(k => attrOf.has(k) && attrOf.get(k).type === 'CheckBox')
+        .sort((a, b) => attrOrder.get(a) - attrOrder.get(b));
+      const optValue = (a, v) => {
+        if (v === null || v === undefined || String(v).trim() === '') return NONE;
+        if (a.type === 'Dropdown') return E(ref.dropdown.get(String(v).toUpperCase()) || v);
+        if (a.type === 'DatePicker') return /^\d{1,2}\/\d{1,2}\/\d{4}/.test(String(v)) ? E(v) : E(formatDate(v));
+        return E(v);
+      };
+      const optionRows = optionList.map(k => {
+        const a = attrOf.get(k);
+        const label = (k === 'IssuedRetroactively' && /^EUR/.test(formCode)) ? 'Issued Retrospectively' : a.name;
+        const subs = ref.attrs.filter(x => x.depends_on === k);
+        return `
+          <div class="py-3 border-b border-slate-100 last:border-0 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-x-6 gap-y-2">
+            <div>${box(extra[k] === true, label)}</div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
+              ${subs.map(s => field(s.name, optValue(s, extra[s.attribute]))).join('')}
+            </div>
+          </div>`;
+      }).join('');
+      const optionsCard = optionList.length ? card('', optionRows) : '';
 
       // ---------- 8. manufacture ----------
       const manuCard = card('Manufacture', `
@@ -2727,7 +2785,7 @@
         ${documentsHtml}
         ${importCard}
         ${miscCard}
-        ${thirdCard}
+        ${optionsCard}
         ${manuCard}
         <details class="mb-2 rounded-lg border border-slate-200 p-4">
           <summary class="cursor-pointer text-sm font-bold text-slate-700">Document log (${logList.length})</summary>
@@ -3604,5 +3662,62 @@ async function ecosysDocsSetPlx(ecis, needed) {
   })();
 }
   </script>
+<!-- Login gate: until the user is signed in, the page shows nothing but this form -->
+<div id="login-gate" class="hidden fixed inset-0 z-[9999] items-center justify-center bg-slate-900">
+  <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+    <img src="logo/logo-uni.png" alt="UNI" class="h-12 mx-auto mb-4">
+    <h2 class="text-lg font-bold text-slate-800 text-center mb-4">Sign in</h2>
+    <input id="login-email" type="email" autocomplete="username" placeholder="Email"
+      class="w-full mb-3 px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    <input id="login-password" type="password" autocomplete="current-password" placeholder="Password"
+      class="w-full mb-3 px-3 py-2 border border-slate-300 rounded-lg text-sm">
+    <div id="login-error" class="hidden mb-3 text-sm text-red-600"></div>
+    <button id="login-button"
+      class="w-full px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Sign in</button>
+  </div>
+</div>
+<div id="login-userbar" class="hidden fixed top-2 right-3 z-[9000] items-center gap-2 text-xs text-slate-500">
+  <span id="login-user"></span>
+  <button id="logout-button" class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50">Sign out</button>
+</div>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const show = (el, on) => { el.classList.toggle('hidden', !on); el.classList.toggle('flex', on); };
+
+  let session = null;
+  try {
+    const { data } = await supabaseClient.auth.getSession();
+    session = data && data.session;
+  } catch (e) { session = null; }
+
+  if (session) {
+    $('login-user').textContent = (session.user && session.user.email) || '';
+    show($('login-userbar'), true);
+  } else {
+    show($('login-gate'), true);
+  }
+
+  async function doLogin() {
+    $('login-error').classList.add('hidden');
+    const { error } = await supabaseClient.auth.signInWithPassword({
+      email: $('login-email').value.trim(),
+      password: $('login-password').value
+    });
+    if (error) {
+      $('login-error').textContent = 'Wrong email or password.';
+      $('login-error').classList.remove('hidden');
+      return;
+    }
+    location.reload();
+  }
+  $('login-button').addEventListener('click', doLogin);
+  $('login-password').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+  $('logout-button').addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+    location.reload();
+  });
+})();
+</script>
 </body>
 </html>
