@@ -3523,20 +3523,39 @@ async function ecosysDocsSetPlx(ecis, needed) {
     }
     ecosysInitKpiCards();
 
-    async function fetchEcosysData() {
+    // ===== CACHE 15 PHÚT CHO ECOSYS =====
+    let ecosysCache = null;
+    let ecosysCacheTime = 0;
+    const ECOSYS_CACHE_MS = 15 * 60 * 1000; // 15 phút
+
+    async function fetchEcosysData(force = false) {
+      const now = Date.now();
+      // Nếu không bắt buộc và cache còn hạn → dùng lại, không gọi API
+      if (!force && ecosysCache && (now - ecosysCacheTime < ECOSYS_CACHE_MS)) {
+        console.log('[ECOSYS] Dùng cache (còn hạn)');
+        ecosysData = ecosysCache;
+        updateEcosysStats();
+        applyEcosysFilter();
+        renderChart();
+        renderFormDonut();
+        return;
+      }
+
       let data;
       try {
         data = await fetchAllRows(() => supabaseClient
           .from('ecosys_data')
-          .select('*')
+          .select('id, so_tiep_nhan, so_co, mau_co, ngay_cap_so, so_to_khai, trang_thai, ngay_khai, ngay_duyet, ngay_cap_phe_duyet, doanh_nghiep_ky')
           .order('ngay_khai', { ascending: false, nullsFirst: false })
           .order('id', { ascending: true }));
       } catch (error) {
         console.error("Lỗi lấy dữ liệu ECOSYS:", error.message);
         return;
       }
-
       ecosysData = data || [];
+      ecosysCache = ecosysData;
+      ecosysCacheTime = now;
+
       await loadEcosysDetailIndex();
       await loadEcosysRejectionReasons();
 
@@ -3553,7 +3572,7 @@ async function ecosysDocsSetPlx(ecis, needed) {
           ecosysByToKhai.get(k).add(co);
         });
       });
-      if (globalData && globalData.length) filterData(); // lọc lại để Form / Số C/O ăn mẫu ECOSYS
+      if (globalData && globalData.length) filterData();
 
       updateEcosysStats();
       applyEcosysFilter();
@@ -3646,7 +3665,7 @@ async function ecosysDocsSetPlx(ecis, needed) {
   const icon = document.getElementById('ecosys-reload-icon');
   if (icon) icon.classList.add('animate-spin');
   label.innerText = "Đang cào nền...";
-  await fetchEcosysData();
+  await fetchEcosysData(true);
 
   // Nền: chờ server báo xong rồi tự nạp lại (tối đa 3 phút), KHÔNG chặn nút
   (async () => {
@@ -3654,7 +3673,7 @@ async function ecosysDocsSetPlx(ecis, needed) {
       await new Promise(r => setTimeout(r, 5000));
       try {
         const { data } = await supabaseClient.from('app_config').select('value').eq('key','scrape_last_done').maybeSingle();
-        if (data && Number(data.value) > t0) { await fetchEcosysData(); break; }
+        if (data && Number(data.value) > t0) { await fetchEcosysData(true); break; }
       } catch (e) {}
     }
     if (icon) icon.classList.remove('animate-spin');
